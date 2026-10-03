@@ -1,0 +1,10 @@
+node_modules/
+dist/
+data/
+.env
+coverage/
+config/*.yml
+!config/*.example.yml
+# personal harness setup — not part of the product
+.agents/
+skills-lock.json

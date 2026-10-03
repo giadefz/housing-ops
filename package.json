@@ -1,0 +1,28 @@
+{
+  "name": "housing-ops",
+  "version": "0.1.0",
+  "description": "Your own housing-search engine — deterministic backend for rent/buy search",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "housing-ops": "./dist/cli/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "housing-ops": "node ./dist/cli/index.js"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  }
+}
