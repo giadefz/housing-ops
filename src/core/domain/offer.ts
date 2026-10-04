@@ -1,7 +1,10 @@
 import type { Analysis, Interaction } from "./analysis.js";
 
+/** All markets. Single source for the Market union. */
+export const MARKETS = ["rent", "buy"] as const;
+
 /** Rent or buy. */
-export type Market = "rent" | "buy";
+export type Market = (typeof MARKETS)[number];
 
 /** A market sighting of a dwelling. Aggregate root. Identity is provider plus listing id. */
 export interface Offer {
@@ -30,29 +33,36 @@ export interface OfferVersion {
 	payload: unknown;
 }
 
+/** All price periods. Single source for the Price period union. */
+export const PRICE_PERIODS = ["month", "once"] as const;
+
 /** A listed price. */
 export interface Price {
 	amount: number;
 	currency: string;
-	period: "month" | "once";
+	period: (typeof PRICE_PERIODS)[number];
 }
 
+/** Every status an offer can hold. Single source for the OfferStatus union. */
+export const OFFER_STATUSES = [
+	"seen",
+	"passed",
+	"pending",
+	"shortlisted",
+	"rejected",
+	"held",
+	"viewed",
+	"favorited",
+	"viewing_requested",
+	"visited",
+	"rejected_by_user",
+	"let",
+	"sold",
+	"gone",
+] as const;
+
 /** Every status an offer can hold. */
-export type OfferStatus =
-	| "seen"
-	| "passed"
-	| "pending"
-	| "shortlisted"
-	| "rejected"
-	| "held"
-	| "viewed"
-	| "favorited"
-	| "viewing_requested"
-	| "visited"
-	| "rejected_by_user"
-	| "let"
-	| "sold"
-	| "gone";
+export type OfferStatus = (typeof OFFER_STATUSES)[number];
 
 /** A market verdict on one offer. */
 export type AgentVerdict = "shortlist" | "reject" | "hold";

@@ -1,15 +1,15 @@
 import fs from "node:fs";
 import Database from "better-sqlite3";
-import { analysisTable } from "./tables/analysis.js";
-import { deadLetterTable } from "./tables/dead-letter.js";
-import { dwellingTable } from "./tables/dwelling.js";
-import { interactionTable } from "./tables/interaction.js";
-import { marketEventTable } from "./tables/market-event.js";
-import { offerTable } from "./tables/offer.js";
-import { offerVersionTable } from "./tables/offer-version.js";
-import { providersStateTable } from "./tables/providers-state.js";
-import { runTable } from "./tables/run.js";
-import { verdictTable } from "./tables/verdict.js";
+import { analysisTable } from "./analysis.js";
+import { deadLetterTable } from "./dead-letter.js";
+import { dwellingTable } from "./dwelling.js";
+import { interactionTable } from "./interaction.js";
+import { marketEventTable } from "./market-event.js";
+import { offerTable } from "./offer.js";
+import { offerVersionTable } from "./offer-version.js";
+import { providersStateTable } from "./providers-state.js";
+import { runTable } from "./run.js";
+import { verdictTable } from "./verdict.js";
 
 /** Persistence definition for one domain object. Owned by the store adapter. */
 export interface TableDefinition {

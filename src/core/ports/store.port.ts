@@ -1,6 +1,6 @@
 import type { Analysis, Interaction } from "../domain/analysis.js";
 import type { Dwelling } from "../domain/dwelling.js";
-import type { Offer, OfferStatus } from "../domain/offer.js";
+import type { MarketOutcome, Offer, OfferStatus } from "../domain/offer.js";
 import type { Verdict } from "../domain/verdict.js";
 
 /** One queue row. Compact by design: full payloads come from findOffer. */
@@ -46,4 +46,9 @@ export interface OfferStorePort {
 	listQueue(status: OfferStatus, limit: number): Promise<OfferSummary[]>;
 	startRun(provider: string): Promise<string>;
 	finishRun(runId: string, stats: RunStats): Promise<void>;
+	markMarketOutcome(
+		offerId: string,
+		outcome: MarketOutcome,
+		observedAt: string,
+	): Promise<void>;
 }

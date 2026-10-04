@@ -39,7 +39,9 @@ Open risks to grill: scraping ToS per country; deduping the same listing across 
 - [x] Phase 0 scaffold done: build passes, 8/8 tests green, `doctor` reports missing config gracefully
 - [x] GitHub repo: private `giadefz/housing-ops`, initial commit `e1f116a` pushed to `main` (identity: Gianluca + noreply email, repo-local)
 - [x] Restructure + Dwelling/Offer split + country packs (D34–D35), committed as `a765987` and pushed to `main`
-- [ ] Next: Phase 1 (storage + offer)
+- [x] Phase 1 slice 1 inc. per-entity tables (D36), committed as `a62e992` and pushed to `main`
+- [x] Phase 1 slice 2 + DAO reshape (D37): dwellings/offers/versions/verdicts/analyses/interactions/runs/market-events + queue + port factory (52 tests)
+- [ ] Next: Phase 1 slice 3 (`offer get` command, store wiring, validate schema check)
 - [ ] Round 3+: dedup strategy, scheduling, security of user-authored code, testing/CI, license
 
 ## Decisions
@@ -49,6 +51,7 @@ Open risks to grill: scraping ToS per country; deduping the same listing across 
 - **D34 — Restructure (skill layout, functional paradigm):** `src/core/{domain,ports,services}` + `src/adapters/{primary,secondary}`; bundled adapters under `src/adapters/secondary/*` + `src/countries/*`, user modules in top-level `*.local/` dirs (auto-discovered; single tsc root requires it). Services are function modules taking data (functional DI — classes only where earned); core imports nothing but zod (fs/yaml/crypto/path live in adapters); the envelope is built in the CLI adapter (wire contract unchanged); `doctor` fully removed → `validate` / `validateWorkspace()` / `ValidationReport` / `findings`; approval replaces pin everywhere (`approvals:` key, `verifyApproval`, `currentHashes`); `src/main.ts` deferred to Phase 1 (first real wiring). Amends D28 (layout) and D25 (pins → approvals).
 - **D35 — Dwelling/Offer split + country packs:** `Dwelling` (physical place, address-key identity, universal facts + pack-validated attributes) vs `Offer` (market sighting, provider identity, price/status/versions/verdicts). New extension axis `countries/` (pure packs: attribute schema, key rules, layout mapping, defaults); Ireland first. BER-style filters generalize to a key/operator/value `attribute` filter. Amends D16 (FilterPort.evaluate gains dwelling) and D17 (schema splits into Dwelling + Offer; rooms optional, fail-open).
 - **D36 — Per-entity table ownership:** table DDL lives with each domain object (`tables/<entity>.ts` in the SQLite adapter: table name, dependencies, CREATE TABLE text), never as a blob in the runner; `migrate.ts` only orders (dependency sort) and applies. Row mapping joins the same modules in slice 2.
+- **D37 — DAO per entity (amends D36):** each SQLite DAO module owns its table's DDL + row DTO/mapping + queries together (`dwelling.ts`, `offer.ts`, `offer-version.ts`, `analysis.ts`, `interaction.ts`, `verdict.ts`, `run.ts`, `dead-letter.ts`, `market-event.ts`, `providers-state.ts`); the `tables/` split is gone. DTO types (`*Row`) translate at the driver edge; the port still speaks entities. `store.ts` is lifecycle only (`openStore`/`closeStore`) plus `createSqliteStore(database)` binding the DAOs to `OfferStorePort`. Cross-entity reads live in projection modules (`queue.ts`). No DAO base class — plain functions.
 
 ### House rules (2026-10-03)
 

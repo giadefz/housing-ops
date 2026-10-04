@@ -43,15 +43,19 @@ export interface Rooms {
 	bathrooms?: number;
 }
 
+/** All coarse universal layouts. Single source for the LayoutType union. */
+export const LAYOUT_TYPES = [
+	"apartment",
+	"penthouse",
+	"studio",
+	"duplex",
+	"terrace",
+	"house",
+	"other",
+] as const;
+
 /** Coarse universal layouts. Provider terms map onto these via the country pack. */
-export type LayoutType =
-	| "apartment"
-	| "penthouse"
-	| "studio"
-	| "duplex"
-	| "terrace"
-	| "house"
-	| "other";
+export type LayoutType = (typeof LAYOUT_TYPES)[number];
 
 /** Country-specific facts, validated against the active country pack schema. */
 export type Attributes = Record<string, unknown>;

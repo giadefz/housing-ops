@@ -3,10 +3,10 @@ import {
 	orderTables,
 	type TableDefinition,
 } from "../src/adapters/secondary/storage/sqlite/migrate.js";
-import { dwellingTable } from "../src/adapters/secondary/storage/sqlite/tables/dwelling.js";
-import { offerTable } from "../src/adapters/secondary/storage/sqlite/tables/offer.js";
-import { offerVersionTable } from "../src/adapters/secondary/storage/sqlite/tables/offer-version.js";
-import { verdictTable } from "../src/adapters/secondary/storage/sqlite/tables/verdict.js";
+import { dwellingTable } from "../src/adapters/secondary/storage/sqlite/dwelling.js";
+import { offerTable } from "../src/adapters/secondary/storage/sqlite/offer.js";
+import { offerVersionTable } from "../src/adapters/secondary/storage/sqlite/offer-version.js";
+import { verdictTable } from "../src/adapters/secondary/storage/sqlite/verdict.js";
 
 function tableNames(tables: TableDefinition[]): string[] {
 	return tables.map((table) => table.table);

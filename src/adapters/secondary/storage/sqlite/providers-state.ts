@@ -1,4 +1,4 @@
-import type { TableDefinition } from "../migrate.js";
+import type { TableDefinition } from "./migrate.js";
 
 /** Provider state table. Health and liveness per source. */
 export const providersStateTable: TableDefinition = {
