@@ -7,7 +7,7 @@ import {
 	closeStore,
 	openStore,
 } from "../src/adapters/secondary/storage/sqlite/store.js";
-import { StoreNotInitializedError } from "../src/core/errors.js";
+import { StoreNotInitializedError } from "../src/core/errors/storage.js";
 
 let roots: string[] = [];
 afterEach(() => {

@@ -1,4 +1,4 @@
-import { OfferNotFoundError } from "../domain/offer.js";
+import { OfferNotFoundError } from "../errors/offer.js";
 import type { OfferDetail } from "../ports/application.port.js";
 import type { OfferStorePort } from "../ports/store.port.js";
 

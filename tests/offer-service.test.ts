@@ -4,7 +4,8 @@ import path from "node:path";
 import type Database from "better-sqlite3";
 import { afterEach, describe, expect, it } from "vitest";
 import type { Dwelling } from "../src/core/domain/dwelling.js";
-import { OfferNotFoundError, type Offer } from "../src/core/domain/offer.js";
+import type { Offer } from "../src/core/domain/offer.js";
+import { OfferNotFoundError } from "../src/core/errors/offer.js";
 import { getOffer } from "../src/core/services/offer.service.js";
 import {
 	createSqliteStore,

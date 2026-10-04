@@ -1,8 +1,11 @@
 import { spawn } from "node:child_process";
-import { z } from "zod";
+import { errorMessage } from "../../../core/errors/message.js";
+import { ProviderError } from "../../../core/errors/provider.js";
 import { ListingSchema, type Listing } from "../../../core/domain/listing.js";
-import { MARKETS } from "../../../core/domain/offer.js";
-import { ProviderError } from "../../../core/errors.js";
+import {
+	ProviderEntrySchema,
+	type ProviderEntry,
+} from "../../../core/schemas/index.js";
 import type {
 	FetchContext,
 	ProviderPort,
@@ -11,23 +14,9 @@ import type {
 /** How a command's stdout carries listings. */
 export type OutputFormat = "jsonl" | "json";
 
-export const CommandProviderSchema = z.object({
-	id: z.string().min(1),
-	country: z.string().min(1),
-	markets: z.array(z.enum(MARKETS)).min(1),
-	command: z.string().min(1),
-	args: z.array(z.string()).default([]),
-	env: z.record(z.string(), z.string()).default({}),
-	output: z.enum(["jsonl", "json"]).default("jsonl"),
-	timeoutMs: z.number().int().positive().optional(),
-});
-
-/** A provider backed by an external command emitting interchange on stdout. */
-export type CommandProviderEntry = z.infer<typeof CommandProviderSchema>;
-
 /** Runs an external command as a provider: its stdout is the listing interchange. */
 export function createCommandProvider(rawEntry: unknown): ProviderPort {
-	const entry = CommandProviderSchema.parse(rawEntry);
+	const entry: ProviderEntry = ProviderEntrySchema.parse(rawEntry);
 	return {
 		id: entry.id,
 		country: entry.country,
@@ -84,7 +73,8 @@ function parseJson(text: string, provider: string): unknown {
 	} catch (error) {
 		throw new ProviderError(
 			provider,
-			`invalid JSON: ${error instanceof Error ? error.message : text}`,
+			`invalid JSON: ${errorMessage(error)}`,
+			error,
 		);
 	}
 }
@@ -99,13 +89,14 @@ function validateListing(
 		throw new ProviderError(
 			provider,
 			`record ${index} failed interchange: ${parsed.error.message}`,
+			parsed.error,
 		);
 	}
 	return parsed.data;
 }
 
 function runProcess(
-	entry: CommandProviderEntry,
+	entry: ProviderEntry,
 	context: FetchContext,
 ): Promise<string> {
 	return new Promise((resolve, reject) => {
@@ -120,7 +111,7 @@ function runProcess(
 			stderr += chunk.toString();
 		});
 		child.on("error", (error) =>
-			reject(new ProviderError(entry.id, error.message)),
+			reject(new ProviderError(entry.id, error.message, error)),
 		);
 		child.on("close", (code) => {
 			if (code === 0)

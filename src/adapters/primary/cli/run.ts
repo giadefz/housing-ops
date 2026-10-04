@@ -1,19 +1,17 @@
-import { OfferNotFoundError } from "../../../core/domain/offer.js";
-import {
-	errorMessage,
-	StoreNotInitializedError,
-} from "../../../core/errors.js";
 import type { ApplicationPort } from "../../../core/ports/application.port.js";
 import { parseArgs, type ParsedArgs } from "./argv.js";
-import { fail, type Envelope, type Failure } from "./envelope.js";
+import { fail, type Envelope } from "./envelope.js";
+import { toFailure } from "./failures.js";
 import { help } from "./commands/help.js";
 import { offerCommands } from "./commands/offer.js";
+import { providerCommands } from "./commands/provider.js";
 import { systemCommands } from "./commands/system.js";
 import type { CommandHandler } from "./commands/types.js";
 
 const commandHandlers: Record<string, CommandHandler> = {
 	...systemCommands,
 	...offerCommands,
+	...providerCommands,
 };
 
 /** Drives the application for one CLI invocation: parse, dispatch, print, set the exit code. */
@@ -42,8 +40,30 @@ async function dispatch(app: ApplicationPort, args: ParsedArgs): Promise<void> {
 	try {
 		finish(await handler(app, args));
 	} catch (error) {
+		logError(error);
 		finish(fail(toFailure(error)));
 	}
+}
+
+/** Writes the full error, and its cause chain, to stderr. stdout stays machine-readable. */
+function logError(error: unknown): void {
+	process.stderr.write(`housing-ops: ${describeError(error)}\n`);
+}
+
+function describeError(error: unknown): string {
+	const parts: string[] = [];
+	let current: unknown = error;
+	while (current !== undefined && current !== null) {
+		parts.push(describeOne(current));
+		current = current instanceof Error ? current.cause : undefined;
+	}
+	return parts.join("\ncaused by: ");
+}
+
+function describeOne(error: unknown): string {
+	if (error instanceof Error)
+		return error.stack ?? `${error.name}: ${error.message}`;
+	return String(error);
 }
 
 function finish(envelope: Envelope<unknown>): void {
@@ -61,28 +81,14 @@ function exitCodeFor(envelope: Envelope<unknown>): number {
 	return 1;
 }
 
-function unknownCommand(command: string): Failure {
+function unknownCommand(command: string): {
+	code: string;
+	message: string;
+	hint: string;
+} {
 	return {
 		code: "UNKNOWN_COMMAND",
 		message: `unknown command: ${command}`,
 		hint: "run housing-ops help for the command list",
 	};
-}
-
-function toFailure(error: unknown): Failure {
-	if (error instanceof OfferNotFoundError) {
-		return {
-			code: "OFFER_NOT_FOUND",
-			message: error.message,
-			hint: "run housing-ops queue to list offers",
-		};
-	}
-	if (error instanceof StoreNotInitializedError) {
-		return {
-			code: "WORKSPACE_NOT_INITIALIZED",
-			message: error.message,
-			hint: "run housing-ops setup",
-		};
-	}
-	return { code: "INTERNAL_ERROR", message: errorMessage(error) };
 }

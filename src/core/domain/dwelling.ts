@@ -1,3 +1,4 @@
+import { InvalidDwellingError } from "../errors/dwelling.js";
 import type { CountryPack } from "./country-pack.js";
 
 /** A physical place someone could live. Aggregate root. Identity is the normalized address key. */
@@ -70,14 +71,6 @@ export interface NewDwelling {
 	floor?: number;
 	floorsTotal?: number;
 	attributes: unknown;
-}
-
-/** Rejected dwelling facts carry the reason. */
-export class InvalidDwellingError extends Error {
-	constructor(reason: string) {
-		super(`invalid dwelling: ${reason}`);
-		this.name = "InvalidDwellingError";
-	}
 }
 
 const SQFT_IN_M2 = 0.092903;

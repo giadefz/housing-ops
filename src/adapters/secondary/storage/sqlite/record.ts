@@ -1,4 +1,4 @@
-import { errorMessage } from "../../../../core/errors.js";
+import { errorMessage } from "../../../../core/errors/message.js";
 
 /** A stored record that cannot be parsed. */
 export class CorruptRecordError extends Error {

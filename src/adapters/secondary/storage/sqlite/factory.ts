@@ -1,5 +1,5 @@
 import fs from "node:fs";
-import { StoreNotInitializedError } from "../../../../core/errors.js";
+import { StoreNotInitializedError } from "../../../../core/errors/storage.js";
 import type {
 	StoreFactory,
 	StoreHandle,

@@ -1,3 +1,4 @@
+import { InvalidTransitionError } from "../errors/offer.js";
 import type { Analysis, Interaction } from "./analysis.js";
 
 /** All markets. Single source for the Market union. */
@@ -78,22 +79,6 @@ export type UserAction =
 
 /** A market outcome that closes the listing. */
 export type MarketOutcome = "let" | "sold" | "gone";
-
-/** Thrown when a status move is illegal. */
-export class InvalidTransitionError extends Error {
-	constructor(status: OfferStatus, action: string) {
-		super(`illegal transition from ${status} in ${action}`);
-		this.name = "InvalidTransitionError";
-	}
-}
-
-/** Thrown when an offer is requested but not stored. */
-export class OfferNotFoundError extends Error {
-	constructor(id: string) {
-		super(`offer not found: ${id}`);
-		this.name = "OfferNotFoundError";
-	}
-}
 
 /** Moves a fresh sighting straight to the terminal queue. Only from seen. */
 export function clearFilters(offer: Offer): Offer {

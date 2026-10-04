@@ -11,7 +11,8 @@ const commands = [
 	{ name: "interact", status: "planned (Phase 5)" },
 	{ name: "prefs", status: "planned (Phase 5)" },
 	{ name: "filter", status: "planned (Phase 3)" },
-	{ name: "provider", status: "planned (Phase 2)" },
+	{ name: "provider test <id>", status: "implemented" },
+	{ name: "provider list", status: "planned (Phase 2)" },
 	{ name: "publish", status: "planned (Phase 6)" },
 ];
 

@@ -4,7 +4,7 @@ import {
 	parseListingOutput,
 } from "../src/adapters/secondary/providers/command-provider.js";
 import type { Listing } from "../src/core/domain/listing.js";
-import { ProviderError } from "../src/core/errors.js";
+import { ProviderError } from "../src/core/errors/provider.js";
 import type { FetchContext } from "../src/core/ports/provider.port.js";
 
 const validRecord = {
@@ -38,6 +38,7 @@ async function collect(iterable: AsyncIterable<Listing>): Promise<Listing[]> {
 function emitCommand(payload: string, output: "jsonl" | "json" = "jsonl") {
 	return {
 		id: "fake",
+		type: "command",
 		country: "ie",
 		markets: ["rent"],
 		command: process.execPath,
@@ -90,6 +91,7 @@ describe("createCommandProvider", () => {
 	it("fails when the command exits non-zero, including stderr", async () => {
 		const provider = createCommandProvider({
 			id: "broken",
+			type: "command",
 			country: "ie",
 			markets: ["rent"],
 			command: process.execPath,
@@ -103,6 +105,7 @@ describe("createCommandProvider", () => {
 	it("fails when the command exceeds its timeout", async () => {
 		const provider = createCommandProvider({
 			id: "slow",
+			type: "command",
 			country: "ie",
 			markets: ["rent"],
 			command: process.execPath,

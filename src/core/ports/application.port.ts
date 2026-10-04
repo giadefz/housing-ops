@@ -1,3 +1,4 @@
+import type { Listing } from "../domain/listing.js";
 import type { Offer } from "../domain/offer.js";
 import type { Verdict } from "../domain/verdict.js";
 
@@ -25,9 +26,16 @@ export interface OfferDetail {
 	verdicts: Verdict[];
 }
 
+/** The result of a capped provider trial. */
+export interface ProviderTestResult {
+	fetched: number;
+	sample: Listing[];
+}
+
 /** The use-case surface every inbound (primary) adapter drives. Inbound adapters depend on this alone. */
 export interface ApplicationPort {
 	getVersion(): VersionInfo;
 	validateWorkspace(): ValidationReport;
 	getOffer(id: string): Promise<OfferDetail>;
+	testProvider(id: string): Promise<ProviderTestResult>;
 }

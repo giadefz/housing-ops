@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { InvalidListingError } from "../errors/listing.js";
 import type { CountryPack } from "./country-pack.js";
 import type {
 	Attributes,
@@ -48,14 +49,6 @@ export interface NormalizeInput {
 	listing: unknown;
 	pack: CountryPack;
 	fetchedAt: string;
-}
-
-/** A listing that failed normalization. Kept in dead-letter, never dropped silently. */
-export class InvalidListingError extends Error {
-	constructor(reason: string) {
-		super(`invalid listing: ${reason}`);
-		this.name = "InvalidListingError";
-	}
 }
 
 export function normalizeListing(input: NormalizeInput): {

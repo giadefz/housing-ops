@@ -5,8 +5,8 @@ import yaml from "js-yaml";
 import {
 	ExtensionApprovalSchema,
 	ExtensionsFileSchema,
-} from "../../core/config-schema.js";
-import type { ConfigFile } from "../../core/config-schema.js";
+} from "../../core/schemas/index.js";
+import type { ConfigFile } from "../../core/schemas/index.js";
 import type { WorkspaceInput } from "../../core/services/validate.service.js";
 import { readSchemaVersion, SCHEMA_VERSION } from "./storage/sqlite/migrate.js";
 

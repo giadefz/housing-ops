@@ -6,8 +6,8 @@ import {
 	ExtensionsFileSchema,
 	type ConfigFile,
 	type ExtensionApproval,
-} from "../config-schema.js";
-import { errorMessage } from "../errors.js";
+} from "../schemas/index.js";
+import { errorMessage } from "../errors/message.js";
 import { API_VERSION } from "../version.js";
 import type { Finding, ValidationReport } from "../ports/application.port.js";
 
