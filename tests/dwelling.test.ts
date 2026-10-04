@@ -4,7 +4,7 @@ import {
 	toSquareMeters,
 	type NewDwelling,
 } from "../src/core/domain/dwelling.js";
-import { irelandPack } from "../countries/ie/pack.js";
+import { irelandPack } from "../src/countries/ie/pack.js";
 
 function dwellingInput(): NewDwelling & { id: string } {
 	return {

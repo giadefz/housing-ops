@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { irelandPack } from "../countries/ie/pack.js";
+import { irelandPack } from "../src/countries/ie/pack.js";
 
 describe("ireland pack", () => {
 	it("maps Irish portal terms to universal layouts", () => {

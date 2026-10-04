@@ -109,3 +109,11 @@ interface Analysis {
 Written by `interact`: `{ id, offer_id, action, reason?, created_at }`.
 `viewed` is recorded when the agent surfaces an offer in a session, so the
 digest can distinguish "seen" from "never shown".
+
+## Dwelling
+
+The physical place behind one or more offers. Identity is the normalized
+address key (same dwelling relisted years later links to the known row).
+Universal facts (address, size + unit, rooms, layout, year built, floors)
+plus pack-validated `attributes` (BER, Eircode, …). Preference learning
+aggregates over dwellings; the pipeline processes offers.

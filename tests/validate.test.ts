@@ -12,7 +12,7 @@ function emptyInput(): WorkspaceInput {
 			"providers.yml": null,
 			"extensions.yml": null,
 		},
-		pinHashes: {},
+		currentHashes: {},
 		databaseExists: false,
 	};
 }

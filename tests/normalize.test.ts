@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { normalizeListing } from "../src/core/domain/listing.js";
-import { irelandPack } from "../countries/ie/pack.js";
+import { irelandPack } from "../src/countries/ie/pack.js";
 
 function rawListing(): unknown {
 	return {

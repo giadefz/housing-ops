@@ -12,16 +12,19 @@
   },
   "scripts": {
     "build": "tsc",
+    "typecheck": "tsc -p tsconfig.check.json",
     "test": "vitest run",
-    "format": "prettier --write src tests countries",
-    "format:check": "prettier --check src tests countries",
+    "format": "prettier --write src tests",
+    "format:check": "prettier --check src tests",
     "housing-ops": "node ./dist/adapters/primary/cli/commands.js"
   },
   "dependencies": {
+    "better-sqlite3": "^13.0.3",
     "js-yaml": "^4.1.0",
     "zod": "^4.0.0"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^24.0.0",
     "prettier": "^3.9.9",

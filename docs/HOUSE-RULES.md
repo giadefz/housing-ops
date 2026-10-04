@@ -49,6 +49,7 @@ Prettier enforces style: tabs, width 4 (`useTabs: true, tabWidth: 4`).
 
 ## Verification
 
-- `npm run build` (strict `tsc`) and `npm test` (vitest) stay green.
+- `npm run build`, `npm run typecheck`, and `npm test` stay green (build
+  emits runtime code including droppable dirs; typecheck also covers tests).
 - New behavior ships with a failing-first test; refactors keep behavior —
   tests are extended, never weakened to fit.

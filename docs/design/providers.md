@@ -48,8 +48,8 @@ Anything runnable works: python, node, a binary. The process's stdout is the
 interchange; stderr is captured into the run log. Timeouts kill the process
 and mark the run degraded.
 
-**Module adapter.** A TS module in `providers/` (bundled) or
-`providers.local/` (yours), for npm libraries or plain HTTP. Same port,
+**Module adapter.** A TS module: bundled in `src/adapters/secondary/providers/`,
+yours in `providers.local/`, for npm libraries or plain HTTP. Same port,
 auto-discovered, local wins on id collision.
 
 ## Pushdown as arguments
