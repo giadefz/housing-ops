@@ -2,9 +2,14 @@ import type Database from "better-sqlite3";
 import { z } from "zod";
 import type { OfferVersion, Price } from "../../../../core/domain/offer.js";
 import type { TableDefinition } from "./migrate.js";
-import { CorruptRowError, parseJson, requireJson, rowId } from "./row.js";
+import {
+	CorruptRecordError,
+	parseJson,
+	requireJson,
+	recordId,
+} from "./record.js";
 
-/** Offer versions table. Immutable snapshots, one row per fetch. */
+/** Offer versions table. Immutable snapshots, one record per fetch. */
 export const offerVersionTable: TableDefinition = {
 	table: "offer_versions",
 	dependsOn: ["offers"],
@@ -19,7 +24,7 @@ CREATE TABLE offer_versions (
 );`,
 };
 
-const OfferVersionRowSchema = z.object({
+const OfferVersionRecordSchema = z.object({
 	offer_id: z.string(),
 	version: z.number(),
 	fetched_at: z.string(),
@@ -27,13 +32,10 @@ const OfferVersionRowSchema = z.object({
 	payload: z.string().nullable(),
 });
 
-/** Offer versions row DTO. */
-export type OfferVersionRow = z.infer<typeof OfferVersionRowSchema>;
+/** Offer versions record DTO. */
+export type OfferVersionRecord = z.infer<typeof OfferVersionRecordSchema>;
 
-export function toOfferVersionRow(
-	offerId: string,
-	version: OfferVersion,
-): OfferVersionRow {
+function toRecord(offerId: string, version: OfferVersion): OfferVersionRecord {
 	return {
 		offer_id: offerId,
 		version: version.version,
@@ -46,12 +48,12 @@ export function toOfferVersionRow(
 	};
 }
 
-export function fromOfferVersionRow(row: unknown): OfferVersion {
-	const parsed = OfferVersionRowSchema.safeParse(row);
+function toDomain(record: unknown): OfferVersion {
+	const parsed = OfferVersionRecordSchema.safeParse(record);
 	if (!parsed.success)
-		throw new CorruptRowError(
+		throw new CorruptRecordError(
 			"offer_versions",
-			rowId(row),
+			recordId(record),
 			parsed.error.message,
 		);
 	const valid = parsed.data;
@@ -79,12 +81,18 @@ export function insertVersion(
 	offerId: string,
 	version: OfferVersion,
 ): void {
-	const row = toOfferVersionRow(offerId, version);
+	const record = toRecord(offerId, version);
 	database
 		.prepare(
 			"INSERT OR IGNORE INTO offer_versions (offer_id, version, fetched_at, price, payload) VALUES (?, ?, ?, ?, ?)",
 		)
-		.run(row.offer_id, row.version, row.fetched_at, row.price, row.payload);
+		.run(
+			record.offer_id,
+			record.version,
+			record.fetched_at,
+			record.price,
+			record.payload,
+		);
 }
 
 /** Lists an offer's versions in order. */
@@ -92,10 +100,10 @@ export function listVersions(
 	database: Database.Database,
 	offerId: string,
 ): OfferVersion[] {
-	const rows: unknown[] = database
+	const records: unknown[] = database
 		.prepare(
 			"SELECT * FROM offer_versions WHERE offer_id = ? ORDER BY version",
 		)
 		.all(offerId);
-	return rows.map((row) => fromOfferVersionRow(row));
+	return records.map((record) => toDomain(record));
 }

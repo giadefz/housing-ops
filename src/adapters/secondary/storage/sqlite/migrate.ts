@@ -102,17 +102,17 @@ export function migrate(database: Database.Database): void {
 
 function readAppliedVersions(database: Database.Database): Set<number> {
 	const applied = new Set<number>();
-	const rows: unknown[] = database
+	const records: unknown[] = database
 		.prepare("SELECT version FROM _migrations")
 		.all();
-	for (const row of rows) {
+	for (const record of records) {
 		if (
-			typeof row === "object" &&
-			row !== null &&
-			"version" in row &&
-			typeof row.version === "number"
+			typeof record === "object" &&
+			record !== null &&
+			"version" in record &&
+			typeof record.version === "number"
 		) {
-			applied.add(row.version);
+			applied.add(record.version);
 		}
 	}
 	return applied;
@@ -129,16 +129,16 @@ export function readSchemaVersion(databaseFile: string): number | null {
 			)
 			.all();
 		if (tables.length === 0) return 0;
-		const row: unknown = database
+		const record: unknown = database
 			.prepare("SELECT MAX(version) AS version FROM _migrations")
 			.get();
 		if (
-			typeof row === "object" &&
-			row !== null &&
-			"version" in row &&
-			typeof row.version === "number"
+			typeof record === "object" &&
+			record !== null &&
+			"version" in record &&
+			typeof record.version === "number"
 		) {
-			return row.version;
+			return record.version;
 		}
 		return 0;
 	} finally {

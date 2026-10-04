@@ -8,7 +8,7 @@ import { migrate } from "./migrate.js";
 import { findOffer, findOfferByListing, saveOffer } from "./offer.js";
 import { listQueue } from "./queue.js";
 import { finishRun, startRun } from "./run.js";
-import { recordVerdict } from "./verdict.js";
+import { listVerdicts, recordVerdict } from "./verdict.js";
 
 /** Opens a database file, migrating on open. Creates the file when missing. */
 export function openStore(databaseFile: string): Database.Database {
@@ -34,6 +34,7 @@ export function createSqliteStore(database: Database.Database): OfferStorePort {
 			findOfferByListing(database, provider, listingId),
 		recordVerdict: (offerId, runId, verdict) =>
 			recordVerdict(database, offerId, runId, verdict),
+		listVerdicts: async (offerId) => listVerdicts(database, offerId),
 		recordAnalysis: (analysis) => recordAnalysis(database, analysis),
 		recordInteraction: (interaction) =>
 			recordInteraction(database, interaction),

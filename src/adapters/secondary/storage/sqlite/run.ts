@@ -3,7 +3,7 @@ import type Database from "better-sqlite3";
 import type { RunStats } from "../../../../core/ports/store.port.js";
 import type { TableDefinition } from "./migrate.js";
 
-/** Runs table. One row per pipeline execution. */
+/** Runs table. One record per pipeline execution. */
 export const runTable: TableDefinition = {
 	table: "runs",
 	dependsOn: [],

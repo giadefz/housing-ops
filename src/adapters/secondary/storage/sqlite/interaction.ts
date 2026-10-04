@@ -3,7 +3,7 @@ import { z } from "zod";
 import { INTERACTION_ACTIONS } from "../../../../core/domain/analysis.js";
 import type { Interaction } from "../../../../core/domain/analysis.js";
 import type { TableDefinition } from "./migrate.js";
-import { CorruptRowError, parseEnum, rowId } from "./row.js";
+import { CorruptRecordError, parseEnum, recordId } from "./record.js";
 
 /** Interactions table. Recorded user reactions on offers, append-only. */
 export const interactionTable: TableDefinition = {
@@ -19,7 +19,7 @@ CREATE TABLE interactions (
 );`,
 };
 
-const InteractionRowSchema = z.object({
+const InteractionRecordSchema = z.object({
 	id: z.string(),
 	offer_id: z.string(),
 	action: z.string(),
@@ -27,10 +27,10 @@ const InteractionRowSchema = z.object({
 	created_at: z.string(),
 });
 
-/** Interactions row DTO. */
-export type InteractionRow = z.infer<typeof InteractionRowSchema>;
+/** Interactions record DTO. */
+export type InteractionRecord = z.infer<typeof InteractionRecordSchema>;
 
-export function toInteractionRow(interaction: Interaction): InteractionRow {
+function toRecord(interaction: Interaction): InteractionRecord {
 	return {
 		id: interaction.id,
 		offer_id: interaction.offerId,
@@ -40,12 +40,12 @@ export function toInteractionRow(interaction: Interaction): InteractionRow {
 	};
 }
 
-export function fromInteractionRow(row: unknown): Interaction {
-	const parsed = InteractionRowSchema.safeParse(row);
+function toDomain(record: unknown): Interaction {
+	const parsed = InteractionRecordSchema.safeParse(record);
 	if (!parsed.success)
-		throw new CorruptRowError(
+		throw new CorruptRecordError(
 			"interactions",
-			rowId(row),
+			recordId(record),
 			parsed.error.message,
 		);
 	const valid = parsed.data;
@@ -69,12 +69,18 @@ export async function recordInteraction(
 	database: Database.Database,
 	interaction: Interaction,
 ): Promise<void> {
-	const row = toInteractionRow(interaction);
+	const record = toRecord(interaction);
 	database
 		.prepare(
 			"INSERT INTO interactions (id, offer_id, action, reason, created_at) VALUES (?, ?, ?, ?, ?)",
 		)
-		.run(row.id, row.offer_id, row.action, row.reason, row.created_at);
+		.run(
+			record.id,
+			record.offer_id,
+			record.action,
+			record.reason,
+			record.created_at,
+		);
 }
 
 /** Lists an offer's interactions in order. */
@@ -82,10 +88,10 @@ export function listInteractions(
 	database: Database.Database,
 	offerId: string,
 ): Interaction[] {
-	const rows: unknown[] = database
+	const records: unknown[] = database
 		.prepare(
 			"SELECT * FROM interactions WHERE offer_id = ? ORDER BY created_at",
 		)
 		.all(offerId);
-	return rows.map((row) => fromInteractionRow(row));
+	return records.map((record) => toDomain(record));
 }

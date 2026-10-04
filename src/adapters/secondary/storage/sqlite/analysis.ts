@@ -8,12 +8,12 @@ import {
 import type { Analysis } from "../../../../core/domain/analysis.js";
 import type { TableDefinition } from "./migrate.js";
 import {
-	CorruptRowError,
+	CorruptRecordError,
 	parseEnum,
 	parseJson,
 	requireJson,
-	rowId,
-} from "./row.js";
+	recordId,
+} from "./record.js";
 
 /** Analyses table. Recorded judgments on offers, cheap or deep, append-only. */
 export const analysisTable: TableDefinition = {
@@ -37,7 +37,7 @@ CREATE TABLE analyses (
 );`,
 };
 
-const AnalysisRowSchema = z.object({
+const AnalysisRecordSchema = z.object({
 	id: z.string(),
 	offer_id: z.string(),
 	tier: z.string(),
@@ -53,10 +53,10 @@ const AnalysisRowSchema = z.object({
 	created_at: z.string(),
 });
 
-/** Analyses row DTO. JSON columns are text, absent values are null. */
-export type AnalysisRow = z.infer<typeof AnalysisRowSchema>;
+/** Analyses record DTO. JSON columns are text, absent values are null. */
+export type AnalysisRecord = z.infer<typeof AnalysisRecordSchema>;
 
-export function toAnalysisRow(analysis: Analysis): AnalysisRow {
+function toRecord(analysis: Analysis): AnalysisRecord {
 	return {
 		id: analysis.id,
 		offer_id: analysis.offerId,
@@ -77,10 +77,14 @@ export function toAnalysisRow(analysis: Analysis): AnalysisRow {
 	};
 }
 
-export function fromAnalysisRow(row: unknown): Analysis {
-	const parsed = AnalysisRowSchema.safeParse(row);
+function toDomain(record: unknown): Analysis {
+	const parsed = AnalysisRecordSchema.safeParse(record);
 	if (!parsed.success)
-		throw new CorruptRowError("analyses", rowId(row), parsed.error.message);
+		throw new CorruptRecordError(
+			"analyses",
+			recordId(record),
+			parsed.error.message,
+		);
 	const valid = parsed.data;
 	return {
 		id: valid.id,
@@ -127,26 +131,26 @@ export async function recordAnalysis(
 	database: Database.Database,
 	analysis: Analysis,
 ): Promise<void> {
-	const row = toAnalysisRow(analysis);
+	const record = toRecord(analysis);
 	database
 		.prepare(
 			`INSERT INTO analyses (id, offer_id, tier, verdict, reason, pros, cons, price_assessment, red_flags, recommendation, confidence, author, created_at)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		)
 		.run(
-			row.id,
-			row.offer_id,
-			row.tier,
-			row.verdict,
-			row.reason,
-			row.pros,
-			row.cons,
-			row.price_assessment,
-			row.red_flags,
-			row.recommendation,
-			row.confidence,
-			row.author,
-			row.created_at,
+			record.id,
+			record.offer_id,
+			record.tier,
+			record.verdict,
+			record.reason,
+			record.pros,
+			record.cons,
+			record.price_assessment,
+			record.red_flags,
+			record.recommendation,
+			record.confidence,
+			record.author,
+			record.created_at,
 		);
 }
 
@@ -155,10 +159,10 @@ export function listAnalyses(
 	database: Database.Database,
 	offerId: string,
 ): Analysis[] {
-	const rows: unknown[] = database
+	const records: unknown[] = database
 		.prepare(
 			"SELECT * FROM analyses WHERE offer_id = ? ORDER BY created_at",
 		)
 		.all(offerId);
-	return rows.map((row) => fromAnalysisRow(row));
+	return records.map((record) => toDomain(record));
 }

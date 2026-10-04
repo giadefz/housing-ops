@@ -8,7 +8,7 @@
     "node": ">=20"
   },
   "bin": {
-    "housing-ops": "./dist/adapters/primary/cli/commands.js"
+    "housing-ops": "./dist/main.js"
   },
   "scripts": {
     "build": "tsc",
@@ -16,7 +16,7 @@
     "test": "vitest run",
     "format": "prettier --write src tests",
     "format:check": "prettier --check src tests",
-    "housing-ops": "node ./dist/adapters/primary/cli/commands.js"
+    "housing-ops": "node ./dist/main.js"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",

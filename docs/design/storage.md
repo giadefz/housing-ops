@@ -28,8 +28,13 @@ the row DTO/mapping, and the queries together. `migrate.ts` collects the
 
 JSON lives in TEXT columns (nested internals are validated at creation, not
 re-validated on read). The `queue` projection joins offers to dwellings for
-compact rows. `store.ts` owns open/close and binds the DAOs to
-`OfferStorePort`.
+compact rows.
+
+The datastore contract lives in core (`core/ports/store.port.ts`):
+`OfferStorePort` (operations) plus `StoreFactory` / `StoreHandle` (opening a
+workspace store and closing it). The SQLite adapter implements both
+(`createSqliteStore`, `sqliteStoreFactory`); composition depends only on the
+port, so a new datastore is a new adapter — no core change.
 
 ## YAML vs DB
 
@@ -41,9 +46,8 @@ where "what I want" is written.
 ## Migrations
 
 Numbered migrations embedded in the store adapter (`migrations` list).
-Each domain object owns its table text (`tables/<entity>.ts` with its
-dependencies); `migrate` only orders and applies them. Applied in order
-on open, recorded in `_migrations`.
-A migration only ever adds tables/columns — history is never rewritten.
-`validate` reads the schema version (without writing) and says how to
-resolve a mismatch. JSON lives in TEXT columns.
+Each domain object owns its table text (`<entity>.ts` with its dependencies);
+`migrate` only orders and applies them. Applied in order on open, recorded
+in `_migrations`. A migration only ever adds tables/columns — history is
+never rewritten. `validate` reads the schema version (without writing) and
+says how to resolve a mismatch. JSON lives in TEXT columns.

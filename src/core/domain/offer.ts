@@ -87,6 +87,14 @@ export class InvalidTransitionError extends Error {
 	}
 }
 
+/** Thrown when an offer is requested but not stored. */
+export class OfferNotFoundError extends Error {
+	constructor(id: string) {
+		super(`offer not found: ${id}`);
+		this.name = "OfferNotFoundError";
+	}
+}
+
 /** Moves a fresh sighting straight to the terminal queue. Only from seen. */
 export function clearFilters(offer: Offer): Offer {
 	rejectUnlessSeen(offer, "clearFilters");

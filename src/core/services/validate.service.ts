@@ -9,18 +9,7 @@ import {
 } from "../config-schema.js";
 import { errorMessage } from "../errors.js";
 import { API_VERSION } from "../version.js";
-
-/** One validation finding: what was examined, whether it passed, and the detail or fix. */
-export interface Finding {
-	name: string;
-	ok: boolean;
-	detail?: string;
-}
-
-/** The complete validation result: every finding in one place. */
-export interface ValidationReport {
-	findings: Finding[];
-}
+import type { Finding, ValidationReport } from "../ports/application.port.js";
 
 /** Everything validation reads: raw config texts, current file hashes, database presence. */
 export interface WorkspaceInput {

@@ -10,14 +10,14 @@ import type {
 } from "../../../../core/domain/dwelling.js";
 import type { TableDefinition } from "./migrate.js";
 import {
-	CorruptRowError,
+	CorruptRecordError,
 	parseEnum,
 	parseJson,
 	requireJson,
-	rowId,
-} from "./row.js";
+	recordId,
+} from "./record.js";
 
-/** Dwellings table. One row per known place, keyed by normalized address. */
+/** Dwellings table. One record per known place, keyed by normalized address. */
 export const dwellingTable: TableDefinition = {
 	table: "dwellings",
 	dependsOn: [],
@@ -36,7 +36,7 @@ CREATE TABLE dwellings (
 );`,
 };
 
-const DwellingRowSchema = z.object({
+const DwellingRecordSchema = z.object({
 	id: z.string(),
 	address_key: z.string(),
 	address: z.string(),
@@ -49,10 +49,10 @@ const DwellingRowSchema = z.object({
 	attributes: z.string(),
 });
 
-/** Dwellings row DTO. JSON columns are text, absent values are null. */
-export type DwellingRow = z.infer<typeof DwellingRowSchema>;
+/** Dwellings record DTO. JSON columns are text, absent values are null. */
+export type DwellingRecord = z.infer<typeof DwellingRecordSchema>;
 
-export function toDwellingRow(dwelling: Dwelling): DwellingRow {
+function toRecord(dwelling: Dwelling): DwellingRecord {
 	return {
 		id: dwelling.id,
 		address_key: dwelling.addressKey,
@@ -71,12 +71,12 @@ export function toDwellingRow(dwelling: Dwelling): DwellingRow {
 	};
 }
 
-export function fromDwellingRow(row: unknown): Dwelling {
-	const parsed = DwellingRowSchema.safeParse(row);
+function toDomain(record: unknown): Dwelling {
+	const parsed = DwellingRecordSchema.safeParse(record);
 	if (!parsed.success)
-		throw new CorruptRowError(
+		throw new CorruptRecordError(
 			"dwellings",
-			rowId(row),
+			recordId(record),
 			parsed.error.message,
 		);
 	const valid = parsed.data;
@@ -115,7 +115,7 @@ export async function saveDwelling(
 	database: Database.Database,
 	dwelling: Dwelling,
 ): Promise<void> {
-	const row = toDwellingRow(dwelling);
+	const record = toRecord(dwelling);
 	database
 		.prepare(
 			`INSERT INTO dwellings (id, address_key, address, size, rooms, layout, year_built, floor, floors_total, attributes)
@@ -125,16 +125,16 @@ export async function saveDwelling(
 			floor = excluded.floor, floors_total = excluded.floors_total, attributes = excluded.attributes`,
 		)
 		.run(
-			row.id,
-			row.address_key,
-			row.address,
-			row.size,
-			row.rooms,
-			row.layout,
-			row.year_built,
-			row.floor,
-			row.floors_total,
-			row.attributes,
+			record.id,
+			record.address_key,
+			record.address,
+			record.size,
+			record.rooms,
+			record.layout,
+			record.year_built,
+			record.floor,
+			record.floors_total,
+			record.attributes,
 		);
 }
 
@@ -143,9 +143,9 @@ export async function findDwellingByAddressKey(
 	database: Database.Database,
 	addressKey: string,
 ): Promise<Dwelling | null> {
-	const row: unknown = database
+	const record: unknown = database
 		.prepare("SELECT * FROM dwellings WHERE address_key = ?")
 		.get(addressKey);
-	if (row === undefined) return null;
-	return fromDwellingRow(row);
+	if (record === undefined) return null;
+	return toDomain(record);
 }

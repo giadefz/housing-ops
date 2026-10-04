@@ -6,9 +6,14 @@ import { listAnalyses } from "./analysis.js";
 import { listInteractions } from "./interaction.js";
 import type { TableDefinition } from "./migrate.js";
 import { insertVersion, listVersions } from "./offer-version.js";
-import { CorruptRowError, parseEnum, requireJson, rowId } from "./row.js";
+import {
+	CorruptRecordError,
+	parseEnum,
+	requireJson,
+	recordId,
+} from "./record.js";
 
-/** Offers table. One row per market sighting, versioned in offer_versions. */
+/** Offers table. One record per market sighting, versioned in offer_versions. */
 export const offerTable: TableDefinition = {
 	table: "offers",
 	dependsOn: ["dwellings"],
@@ -30,7 +35,7 @@ CREATE TABLE offers (
 );`,
 };
 
-const OfferRowSchema = z.object({
+const OfferRecordSchema = z.object({
 	id: z.string(),
 	dwelling_id: z.string(),
 	provider: z.string(),
@@ -45,13 +50,13 @@ const OfferRowSchema = z.object({
 	status: z.string(),
 });
 
-/** Offers row DTO. JSON columns are text, absent values are null. */
-export type OfferRow = z.infer<typeof OfferRowSchema>;
+/** Offers record DTO. JSON columns are text, absent values are null. */
+export type OfferRecord = z.infer<typeof OfferRecordSchema>;
 
 /** An offer without its children. Versions, analyses, and interactions load separately. */
 export type StoredOffer = Omit<Offer, "versions" | "analyses" | "interactions">;
 
-export function toOfferRow(offer: Offer): OfferRow {
+function toRecord(offer: Offer): OfferRecord {
 	return {
 		id: offer.id,
 		dwelling_id: offer.dwellingId,
@@ -68,10 +73,14 @@ export function toOfferRow(offer: Offer): OfferRow {
 	};
 }
 
-export function fromOfferRow(row: unknown): StoredOffer {
-	const parsed = OfferRowSchema.safeParse(row);
+function toDomain(record: unknown): StoredOffer {
+	const parsed = OfferRecordSchema.safeParse(record);
 	if (!parsed.success)
-		throw new CorruptRowError("offers", rowId(row), parsed.error.message);
+		throw new CorruptRecordError(
+			"offers",
+			recordId(record),
+			parsed.error.message,
+		);
 	const valid = parsed.data;
 	return {
 		id: valid.id,
@@ -100,21 +109,21 @@ export function fromOfferRow(row: unknown): StoredOffer {
 	};
 }
 
-/** Persists an offer row and any new versions. Re-saving is idempotent. */
+/** Persists an offer record and any new versions. Re-saving is idempotent. */
 export async function saveOffer(
 	database: Database.Database,
 	offer: Offer,
 ): Promise<void> {
 	const save = database.transaction((current: Offer) => {
-		upsertOfferRow(database, current);
+		upsertOfferRecord(database, current);
 		for (const version of current.versions)
 			insertVersion(database, current.id, version);
 	});
 	save(offer);
 }
 
-function upsertOfferRow(database: Database.Database, offer: Offer): void {
-	const row = toOfferRow(offer);
+function upsertOfferRecord(database: Database.Database, offer: Offer): void {
+	const record = toRecord(offer);
 	database
 		.prepare(
 			`INSERT INTO offers (id, dwelling_id, provider, listing_id, url, market, price, images, description, posted_at, fetched_at, status)
@@ -125,18 +134,18 @@ function upsertOfferRow(database: Database.Database, offer: Offer): void {
 			fetched_at = excluded.fetched_at, status = excluded.status`,
 		)
 		.run(
-			row.id,
-			row.dwelling_id,
-			row.provider,
-			row.listing_id,
-			row.url,
-			row.market,
-			row.price,
-			row.images,
-			row.description,
-			row.posted_at,
-			row.fetched_at,
-			row.status,
+			record.id,
+			record.dwelling_id,
+			record.provider,
+			record.listing_id,
+			record.url,
+			record.market,
+			record.price,
+			record.images,
+			record.description,
+			record.posted_at,
+			record.fetched_at,
+			record.status,
 		);
 }
 
@@ -145,11 +154,11 @@ export async function findOffer(
 	database: Database.Database,
 	id: string,
 ): Promise<Offer | null> {
-	const row: unknown = database
+	const record: unknown = database
 		.prepare("SELECT * FROM offers WHERE id = ?")
 		.get(id);
-	if (row === undefined) return null;
-	return assembleOffer(database, fromOfferRow(row));
+	if (record === undefined) return null;
+	return assembleOffer(database, toDomain(record));
 }
 
 function assembleOffer(database: Database.Database, base: StoredOffer): Offer {
@@ -167,18 +176,18 @@ export async function findOfferByListing(
 	provider: string,
 	listingId: string,
 ): Promise<Offer | null> {
-	const row: unknown = database
+	const record: unknown = database
 		.prepare("SELECT id FROM offers WHERE provider = ? AND listing_id = ?")
 		.get(provider, listingId);
-	if (!hasId(row)) return null;
-	return findOffer(database, row.id);
+	if (!hasId(record)) return null;
+	return findOffer(database, record.id);
 }
 
-function hasId(row: unknown): row is { id: string } {
+function hasId(record: unknown): record is { id: string } {
 	return (
-		typeof row === "object" &&
-		row !== null &&
-		"id" in row &&
-		typeof row.id === "string"
+		typeof record === "object" &&
+		record !== null &&
+		"id" in record &&
+		typeof record.id === "string"
 	);
 }

@@ -28,7 +28,7 @@ function configPath(root: string, file: ConfigFile): string {
 	return path.join(root, "config", file);
 }
 
-function databasePath(root: string): string {
+export function databasePath(root: string): string {
 	return path.join(root, "data", "housing.db");
 }
 

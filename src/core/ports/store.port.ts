@@ -3,7 +3,7 @@ import type { Dwelling } from "../domain/dwelling.js";
 import type { MarketOutcome, Offer, OfferStatus } from "../domain/offer.js";
 import type { Verdict } from "../domain/verdict.js";
 
-/** One queue row. Compact by design: full payloads come from findOffer. */
+/** One queue entry. Compact by design: full payloads come from findOffer. */
 export interface OfferSummary {
 	id: string;
 	provider: string;
@@ -41,6 +41,7 @@ export interface OfferStorePort {
 		runId: string,
 		verdict: Verdict,
 	): Promise<void>;
+	listVerdicts(offerId: string): Promise<Verdict[]>;
 	recordAnalysis(analysis: Analysis): Promise<void>;
 	recordInteraction(interaction: Interaction): Promise<void>;
 	listQueue(status: OfferStatus, limit: number): Promise<OfferSummary[]>;
@@ -51,4 +52,15 @@ export interface OfferStorePort {
 		outcome: MarketOutcome,
 		observedAt: string,
 	): Promise<void>;
+}
+
+/** An open store plus its lifecycle. What composition holds and closes. */
+export interface StoreHandle {
+	store: OfferStorePort;
+	close(): void;
+}
+
+/** Opens a workspace's store. Implemented by each datastore adapter. */
+export interface StoreFactory {
+	open(workspaceRoot: string): StoreHandle;
 }

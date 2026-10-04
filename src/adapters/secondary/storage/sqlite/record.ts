@@ -1,21 +1,21 @@
 import { errorMessage } from "../../../../core/errors.js";
 
-/** A stored row that cannot be parsed. */
-export class CorruptRowError extends Error {
+/** A stored record that cannot be parsed. */
+export class CorruptRecordError extends Error {
 	constructor(table: string, id: string, reason: string) {
-		super(`corrupt ${table} row ${id}: ${reason}`);
-		this.name = "CorruptRowError";
+		super(`corrupt ${table} record ${id}: ${reason}`);
+		this.name = "CorruptRecordError";
 	}
 }
 
-export function rowId(row: unknown): string {
+export function recordId(record: unknown): string {
 	if (
-		typeof row === "object" &&
-		row !== null &&
-		"id" in row &&
-		typeof row.id === "string"
+		typeof record === "object" &&
+		record !== null &&
+		"id" in record &&
+		typeof record.id === "string"
 	) {
-		return row.id;
+		return record.id;
 	}
 	return "unknown";
 }
@@ -32,7 +32,7 @@ export function parseJson<T>(
 	try {
 		parsed = JSON.parse(text);
 	} catch (error) {
-		throw new CorruptRowError(
+		throw new CorruptRecordError(
 			table,
 			id,
 			`${column}: ${errorMessage(error)}`,
@@ -50,7 +50,7 @@ export function requireJson<T>(
 ): T {
 	const parsed = parseJson<T>(table, id, column, text);
 	if (parsed === undefined)
-		throw new CorruptRowError(table, id, `${column}: missing`);
+		throw new CorruptRecordError(table, id, `${column}: missing`);
 	return parsed;
 }
 
@@ -65,5 +65,9 @@ export function parseEnum<T extends string>(
 	for (const member of members) {
 		if (member === value) return member;
 	}
-	throw new CorruptRowError(table, id, `${column}: unknown value ${value}`);
+	throw new CorruptRecordError(
+		table,
+		id,
+		`${column}: unknown value ${value}`,
+	);
 }

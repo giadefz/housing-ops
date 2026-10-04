@@ -79,6 +79,8 @@ relies on:
   otherwise — including empty results, which are `ok` with empty `data`.
 - All writes go through the api surface. The DB file is touched only by the
   storage adapter and numbered migrations — nothing hand-edits it.
+- Primary adapters depend only on the inbound port (`ApplicationPort`),
+  never on services or the store directly; `src/main.ts` wires the rest.
 
 ## Component map
 
