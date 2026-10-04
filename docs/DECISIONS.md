@@ -41,8 +41,8 @@ Open risks to grill: scraping ToS per country; deduping the same listing across 
 - [x] Restructure + Dwelling/Offer split + country packs (D34–D35), committed as `a765987` and pushed to `main`
 - [x] Phase 1 slice 1 inc. per-entity tables (D36), committed as `a62e992` and pushed to `main`
 - [x] Phase 1 slice 2 + DAO reshape (D37): dwellings/offers/versions/verdicts/analyses/interactions/runs/market-events + queue + port factory (52 tests), committed as `e9a9f11` and pushed to `main`
-- [x] Phase 1 slice 3a: `offer get` — `getOffer` use case + `OfferNotFoundError` + `listVerdicts` port/DAO + CLI command (56 tests, uncommitted)
-- [ ] Next: Phase 1 slice 3b (composition root `main.ts` + `validate` schema-version finding)
+- [x] Phase 1 slice 3a: `offer get` + inbound port + modular CLI + datastore abstraction + record vocabulary (D38–D39, 56 tests), committed as `e7752f1` and pushed to `main`
+- [ ] Next: Phase 1 slice 3b (`validate` schema-version finding); composition root (`src/main.ts`) already delivered with D39
 - [ ] Round 3+: dedup strategy, scheduling, security of user-authored code, testing/CI, license
 
 ## Decisions
