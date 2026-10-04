@@ -26,6 +26,15 @@ export interface OfferDetail {
 	verdicts: Verdict[];
 }
 
+/** One configured provider, as listed from providers.yml. */
+export interface ProviderSummary {
+	id: string;
+	type: string;
+	country: string;
+	markets: string[];
+	enabled: boolean;
+}
+
 /** The result of a capped provider trial. */
 export interface ProviderTestResult {
 	fetched: number;
@@ -37,5 +46,6 @@ export interface ApplicationPort {
 	getVersion(): VersionInfo;
 	validateWorkspace(): ValidationReport;
 	getOffer(id: string): Promise<OfferDetail>;
+	listProviders(): ProviderSummary[];
 	testProvider(id: string): Promise<ProviderTestResult>;
 }

@@ -3,12 +3,14 @@
 `ApplicationPort` (`core/ports/application.port.ts`) is the versioned use-case
 surface every inbound adapter drives; it owns the shared result types
 (`VersionInfo`, `Finding`, `ValidationReport`, `OfferDetail`).
-`createApplication(root)` (`src/main.ts`) binds the store factory, workspace
-reader, and services to it — the only place adapters are wired. The CLI
+`createApplication(root, dependencies)` (`src/composition.ts`) wires the given
+adapters — the store factory (a port) plus the workspace reader and services —
+into it; `createDefaultApplication(root)` (`src/defaults.ts`) supplies the
+bundled adapters. Each inbound adapter has its own entry point. The CLI
 adapter is split by concept (`cli/commands/<concept>.ts`) behind a shared
 `CommandHandler`; `cli/run.ts` parses argv, dispatches, prints the envelope,
 and sets the exit code. Future interfaces (REST, UI) depend on the same port
-and build the same envelope.
+and build their own envelope.
 
 `housing-ops version` → `{ core: "0.1.0", api: 1 }`. Breaking the envelope
 or any command's `data` shape bumps `api`; `validate` refuses to run flows
@@ -29,7 +31,7 @@ against a mismatched api version and tells the user to update.
 | `prefs set <path> <json-value>` | path + value | `{ path, value }` — validated write, fails loudly on bad input |
 | `filter list` | — | `{ filters: [{ id, source: bundled\|local, enabled, configured }] }` |
 | `filter check <id>` | id | `{ schema_ok, dry_run: { evaluated, pass, fail, skipped, examples: [...] } }` |
-| `provider list` | — | `{ providers: [{ id, type, country, markets, enabled, health }] }` |
+| `provider list` | — | `{ providers: [{ id, type, country, markets, enabled }] }` |
 | `provider test <id>` | id | `{ fetched, sample: [Listing] }` — capped sample, validates interchange |
 | `publish now [--event offer.passed]` | flags | `{ published: [{ publisher, event, offer_id, ok }] }` |
 

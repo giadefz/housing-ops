@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { buildProviders } from "../src/adapters/secondary/providers/registry.js";
+import {
+	buildProviders,
+	listProviderSummaries,
+} from "../src/adapters/secondary/providers/registry.js";
 import { ConfigError } from "../src/core/errors/config.js";
 
 const valid = `
@@ -35,5 +38,22 @@ providers:
 	});
 	it("throws ConfigError on malformed YAML", () => {
 		expect(() => buildProviders("version: [unclosed")).toThrow(ConfigError);
+	});
+});
+
+describe("listProviderSummaries", () => {
+	it("lists the configured providers", () => {
+		expect(listProviderSummaries(valid)).toEqual([
+			{
+				id: "fake",
+				type: "process",
+				country: "ie",
+				markets: ["rent"],
+				enabled: true,
+			},
+		]);
+	});
+	it("returns an empty list when there is no providers.yml", () => {
+		expect(listProviderSummaries(null)).toEqual([]);
 	});
 });
