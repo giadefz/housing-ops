@@ -6,25 +6,16 @@ memory beyond what the context hands it. The pipeline runs them in
 
 ## The contract (v0 — provisional)
 
-```ts
-interface Filter {
-  id: string
-  schema: ZodType                // validates this filter's own config
-  evaluate(ctx: { offer: Offer; prefs: Profile; history: History }): Promise<Verdict>
-}
+A filter has an id, a config schema that validates its own config, and an
+`evaluate` step. `evaluate` receives the offer, the dwelling, the profile, and
+comparables from history, and returns a **verdict**: pass; fail with a reason;
+or skip with a reason (insufficient data).
 
-type Verdict =
-  | { pass: true }
-  | { pass: false; reason: string }
-  | { skip: true; reason: string }   // insufficient data
-```
-
-Provisional means: the shape above is the working hypothesis, finalized
-against real provider data in Phase 3. Prefer small filters with sharp
-reasons over clever ones — the agent reads these reasons during triage.
-
-`History` is read-only access to stored offers (for comparables, e.g.
-price-outlier checks), never to other filters' internals.
+Provisional means the shape is the working hypothesis, finalized against real
+provider data in Phase 3. Prefer small filters with sharp reasons over clever
+ones — the agent reads these reasons during triage. History is read-only access
+to stored offers (for comparables, e.g. price-outlier checks), never to other
+filters' internals.
 
 ## Pipeline file
 
@@ -57,5 +48,5 @@ taste live behind the gate, not here.
 The harness writes the module into `filters.local/`, runs
 `filter check <id>` — schema validation plus a dry-run against stored
 offers showing the verdict distribution with examples — and asks you to
-approve. Approval records the pin (`config.md`); only then can the filter be
+approve. Approval records the hash (`config.md`); only then can the filter be
 enabled in `pipeline.yml`.

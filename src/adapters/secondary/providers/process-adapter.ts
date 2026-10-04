@@ -11,11 +11,11 @@ import type {
 	ProviderPort,
 } from "../../../core/ports/provider.port.js";
 
-/** How a command's stdout carries listings. */
+/** How a process's stdout carries listings. */
 export type OutputFormat = "jsonl" | "json";
 
-/** Runs an external command as a provider: its stdout is the listing interchange. */
-export function createCommandProvider(rawEntry: unknown): ProviderPort {
+/** Runs an external process as a provider: its stdout is the listing interchange. */
+export function createProcessAdapter(rawEntry: unknown): ProviderPort {
 	const entry: ProviderEntry = ProviderEntrySchema.parse(rawEntry);
 	return {
 		id: entry.id,
@@ -35,7 +35,7 @@ export function createCommandProvider(rawEntry: unknown): ProviderPort {
 	};
 }
 
-/** Parses command output into validated listings. Blank lines are skipped. */
+/** Parses process output into validated listings. Blank lines are skipped. */
 export function parseListingOutput(
 	text: string,
 	output: OutputFormat,

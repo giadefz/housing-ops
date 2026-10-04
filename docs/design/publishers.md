@@ -5,18 +5,11 @@ and never mutate the DB — they read events and deliver them.
 
 ## The contract
 
-```ts
-interface Publisher {
-  id: string
-  schema: ZodType                // validates this publisher's own config
-  publish(event: PipelineEvent, payload: unknown): Promise<void>
-}
-
-type PipelineEvent = 'offer.passed' | 'offer.updated' | 'offer.judged'
-```
-
-Payloads are the full `offer get` shape for the subject offer plus the event
-metadata — a consumer never needs a second call.
+A publisher has an id, a config schema that validates its own config, and a
+`publish` step taking an event and a payload. The events are `offer.passed`,
+`offer.updated`, and `offer.judged`. Payloads are the full `offer get` shape
+for the subject offer plus event metadata — a consumer never needs a second
+call, and a failed delivery never blocks the pipeline.
 
 ## Events
 
@@ -30,10 +23,9 @@ metadata — a consumer never needs a second call.
 
 Generic HTTP POST of the event payload, optional HMAC signature header,
 three delivery attempts with backoff, failures recorded on the run (never
-crashing it). Declared in `providers.yml`'s sibling config with `url`,
-`secret?`, `events: [offer.passed]`.
+crashing it). Declared in the config alongside providers with a url, an
+optional secret, and the events it subscribes to.
 
 The default terminal stays the to-evaluate queue you check with your agent —
-publishers are optional attachments, and a failed delivery never blocks the
-pipeline. DynamoDB-push and Telegram are documented future/user-authored
-adapters, not v1 scope.
+publishers are optional attachments. DynamoDB-push and Telegram are documented
+future/user-authored adapters, not v1 scope.

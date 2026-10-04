@@ -6,7 +6,7 @@ const valid = `
 version: 1
 providers:
   - id: fake
-    type: command
+    type: process
     country: ie
     markets: [rent]
     command: echo

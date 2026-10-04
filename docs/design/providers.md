@@ -1,83 +1,102 @@
-# Providers
+# Providers — core, port, adapter
 
-A provider fetches listings from one source and yields interchange records
-(`offer.md`). Providers never judge — judgment is the pipeline's job.
+The core must search housing sources it cannot know about. A **provider** is a
+source of listings (Daft, MyHome, …). The core reaches providers only through a
+**port**; a provider is realized by an **adapter** that obeys that port. This
+keeps every source's messiness outside the hexagon.
+
+```mermaid
+flowchart LR
+  subgraph core["core"]
+    P["ProviderPort"]
+    PL["pipeline: validate, normalize, store"]
+    P --> PL
+  end
+  subgraph adapter["adapter (outside the core)"]
+    A["process adapter"]
+    S["external program"]
+    S --> A
+  end
+  A -->|obeys| P
+```
+
+## The boundary
+
+The core and the outside meet at one data shape: the **interchange**
+(`Listing`, "listing JSON v1"). Every provider must emit it. At the boundary
+the core:
+
+1. **validates** each `Listing` against `ListingSchema` — nothing crosses unchecked;
+2. **normalizes** it into a `Dwelling` and an `Offer`.
+
+```mermaid
+flowchart LR
+  RAW["raw output"] --> TR["translate<br/>(per provider)"]
+  TR --> L["Listing"]
+  L --> V["validate<br/>(core)"]
+  V --> N["normalize<br/>(core)"]
+  N --> DO["Dwelling + Offer"]
+```
+
+Translation (raw output → `Listing`) is the only provider-specific step. Two
+ways to do it, both leaving the third-party tool untouched:
+
+- **A — the program translates:** a small wrapper script prints our JSON.
+- **B — the mapping translates:** a `mapping` in config tells our adapter how
+  to read the tool's own output.
 
 ## The port
 
-```ts
-interface Provider {
-  id: string
-  country: string                // 'ie', …
-  markets: ('rent' | 'buy')[]
-  schema: ZodType                // validates this provider's own config
-  fetch(cfg: unknown, ctx: FetchCtx): AsyncIterable<Listing>
-}
+A provider has an id, a country, the markets it serves, and a `fetch` that
+streams listings. The core hands `fetch` a small context: an abort signal for
+cancellation and timeout, a `pace` function that spaces requests, and a `log`
+function. The adapter raises failures; the core validates, normalizes, and
+dead-letters malformed output instead of crashing the run.
 
-interface FetchCtx {
-  signal: AbortSignal            // timeout + cancellation
-  pace: () => Promise<void>      // call between requests; core enforces spacing
-  log: (msg: string) => void
-}
+## Adapter kinds
+
+**Process adapter (primary).** Runs an external program and reads its **stdout**
+as the interchange.
+
+```mermaid
+flowchart TD
+  Y["providers.yml entry"] --> C["createProcessAdapter()"]
+  C --> P["ProviderPort"]
+  P --> F["fetch()"]
+  F --> RUN["run program"]
+  RUN --> OUT["stdout: Listing data"]
+  RUN --> ERR["stderr: logs"]
+  OUT --> PARSE["parse + validate"]
+  PARSE --> LS["Listings"]
 ```
 
-`fetch` streams `Listing` records; the core validates each against the
-interchange schema, normalizes to Offer, and routes failures to dead-letter.
-A provider that cannot reach its source reports degraded health instead of
-throwing the run away — partial results with a health flag beat an all-or-nothing crash.
-
-## Two adapter kinds
-
-**Command adapter (primary).** Declared in `providers.yml`, no code in our
-repo:
+The contract is the Unix one: **stdout is data, stderr is logs.** The program
+still runs fine by hand; wired as a provider, whatever it writes to stdout is
+parsed as `Listing`.
 
 ```yaml
 - id: daft
-  type: command
+  type: process
   country: ie
   markets: [rent, buy]
-  enabled: true
   command: python3
-  args: ["-c", "…jsonl wrapper…"]   # core may append constraint args the tool supports
+  args: ["providers.local/daft.py"]
   env: { DAFT_COOKIE: "${DAFT_COOKIE}" }
-  output: jsonl                     # jsonl | json | file
-  timeout_s: 120
+  output: jsonl            # jsonl | json
+  timeoutMs: 120000
 ```
 
-Anything runnable works: python, node, a binary. The process's stdout is the
-interchange; stderr is captured into the run log. Timeouts kill the process
-and mark the run degraded.
-
-**Module adapter.** A TS module: bundled in `src/adapters/secondary/providers/`,
-yours in `providers.local/`, for npm libraries or plain HTTP. Same port,
-auto-discovered, local wins on id collision.
-
-## Pushdown as arguments
-
-Where the underlying tool supports search constraints (price, beds, area),
-the core passes the profile's hard constraints as provider arguments —
-declared per provider in `providers.yml` under `constraints:`. Pure
-optimization: everything is re-validated locally, and a tool that ignores
-constraints still works, just slower.
+**Module adapter.** TypeScript in `providers.local/`, obeying the same port in
+code, for npm libraries or plain HTTP.
 
 ## Pacing and health
 
-Defaults: ≥3s between requests (`pace()` enforces it), low page ceilings,
-per-provider overrides in config only downward. No bot-protection
-circumvention: a walled source yields `health: degraded` with the evidence
-(status code, challenge page hash), consecutive failures accumulate in
-`providers_state`, and `doctor` reports them. Auth- or cookie-gated sources
-live in `providers.local/` and load only when explicitly enabled.
+The core paces requests and never circumvents bot protection: a walled source
+becomes `health: degraded`, not a bypass. Auth- or cookie-gated sources stay in
+`providers.local/` and load only when enabled.
 
-## v1 examples
+## Trying a provider
 
-- **daft** (command, `daftlistings` via a `python -c` JSONL wrapper) —
-  primary worked example; `daft-scraper` documented as fallback config.
-- **myhome** (module, search-page embedded-JSON parsing) — minimal;
-  the hosted actor documented as a paid alternative.
-- **rent.ie** (module, feed + detail pages) — minimal.
-  Each stays thin and replaceable; any entry can point at a different command
-  without touching core code.
-
-`provider test <id>` runs the adapter capped (one page / N records) and shows
-the interchange sample — the loop used while wiring a new source.
+`provider test <id>` runs one provider on a capped sample and shows the
+validated interchange — the loop for wiring a source. When it fails, the error
+names the record that broke the contract.

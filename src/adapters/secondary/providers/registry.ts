@@ -3,7 +3,7 @@ import { ConfigError } from "../../../core/errors/config.js";
 import { errorMessage } from "../../../core/errors/message.js";
 import { ProvidersFileSchema } from "../../../core/schemas/index.js";
 import type { ProviderPort } from "../../../core/ports/provider.port.js";
-import { createCommandProvider } from "./command-provider.js";
+import { createProcessAdapter } from "./process-adapter.js";
 
 /** Builds providers from the providers.yml text, keyed by id. An invalid file throws. */
 export function buildProviders(
@@ -19,7 +19,7 @@ export function buildProviders(
 	}
 	const providers = new Map<string, ProviderPort>();
 	for (const entry of parsed.data.providers) {
-		providers.set(entry.id, createCommandProvider(entry));
+		providers.set(entry.id, createProcessAdapter(entry));
 	}
 	return providers;
 }

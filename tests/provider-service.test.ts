@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createCommandProvider } from "../src/adapters/secondary/providers/command-provider.js";
+import { createProcessAdapter } from "../src/adapters/secondary/providers/process-adapter.js";
 import { testProvider } from "../src/core/services/provider.service.js";
 
 function record(id: string): string {
@@ -13,9 +13,9 @@ function record(id: string): string {
 }
 
 function fakeProvider(payload: string) {
-	return createCommandProvider({
+	return createProcessAdapter({
 		id: "fake",
-		type: "command",
+		type: "process",
 		country: "ie",
 		markets: ["rent"],
 		command: process.execPath,
@@ -39,9 +39,9 @@ describe("testProvider", () => {
 		]);
 	});
 	it("propagates provider errors", async () => {
-		const provider = createCommandProvider({
+		const provider = createProcessAdapter({
 			id: "bad",
-			type: "command",
+			type: "process",
 			country: "ie",
 			markets: ["rent"],
 			command: process.execPath,

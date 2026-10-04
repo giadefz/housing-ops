@@ -4,7 +4,7 @@ import { MARKETS } from "../domain/offer.js";
 /** One provider entry from providers.yml. */
 export const ProviderEntrySchema = z.object({
 	id: z.string().min(1),
-	type: z.literal("command"),
+	type: z.literal("process"),
 	country: z.string().min(1),
 	markets: z.array(z.enum(MARKETS)).min(1),
 	enabled: z.boolean().default(true),

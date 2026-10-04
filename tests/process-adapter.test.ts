@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-	createCommandProvider,
+	createProcessAdapter,
 	parseListingOutput,
-} from "../src/adapters/secondary/providers/command-provider.js";
+} from "../src/adapters/secondary/providers/process-adapter.js";
 import type { Listing } from "../src/core/domain/listing.js";
 import { ProviderError } from "../src/core/errors/provider.js";
 import type { FetchContext } from "../src/core/ports/provider.port.js";
@@ -35,10 +35,10 @@ async function collect(iterable: AsyncIterable<Listing>): Promise<Listing[]> {
 	return listings;
 }
 
-function emitCommand(payload: string, output: "jsonl" | "json" = "jsonl") {
+function emitProcess(payload: string, output: "jsonl" | "json" = "jsonl") {
 	return {
 		id: "fake",
-		type: "command",
+		type: "process",
 		country: "ie",
 		markets: ["rent"],
 		command: process.execPath,
@@ -78,20 +78,20 @@ describe("parseListingOutput", () => {
 	});
 });
 
-describe("createCommandProvider", () => {
-	it("yields validated listings from a command", async () => {
-		const provider = createCommandProvider(
-			emitCommand(`${JSON.stringify(validRecord)}\n`),
+describe("createProcessAdapter", () => {
+	it("yields validated listings from a process", async () => {
+		const provider = createProcessAdapter(
+			emitProcess(`${JSON.stringify(validRecord)}\n`),
 		);
 		const listings = await collect(provider.fetch({}, context()));
 		expect(listings).toEqual([validRecord]);
 		expect(provider.id).toBe("fake");
 		expect(provider.markets).toEqual(["rent"]);
 	});
-	it("fails when the command exits non-zero, including stderr", async () => {
-		const provider = createCommandProvider({
+	it("fails when the process exits non-zero, including stderr", async () => {
+		const provider = createProcessAdapter({
 			id: "broken",
-			type: "command",
+			type: "process",
 			country: "ie",
 			markets: ["rent"],
 			command: process.execPath,
@@ -102,10 +102,10 @@ describe("createCommandProvider", () => {
 			/kaboom/,
 		);
 	});
-	it("fails when the command exceeds its timeout", async () => {
-		const provider = createCommandProvider({
+	it("fails when the process exceeds its timeout", async () => {
+		const provider = createProcessAdapter({
 			id: "slow",
-			type: "command",
+			type: "process",
 			country: "ie",
 			markets: ["rent"],
 			command: process.execPath,
@@ -118,6 +118,6 @@ describe("createCommandProvider", () => {
 		).rejects.toBeInstanceOf(ProviderError);
 	});
 	it("rejects an invalid provider config", () => {
-		expect(() => createCommandProvider({ id: "x" })).toThrow();
+		expect(() => createProcessAdapter({ id: "x" })).toThrow();
 	});
 });
