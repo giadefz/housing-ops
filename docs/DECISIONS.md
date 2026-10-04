@@ -45,7 +45,7 @@ Open risks to grill: scraping ToS per country; deduping the same listing across 
 - [x] Phase 1 slice 3b: `validate` schema-version finding (60 tests) — **Phase 1 complete**
 - [x] Phase 2 slice 2a: process adapter (69 tests), committed as `78b31de` and pushed to `main`
 - [x] Phase 2 slice 2b: providers.yml schema + registry + `provider test <id>` (75 tests, uncommitted)
-- [ ] Next: Phase 2 slice 2c (`provider list`, translation for daft, then scan)
+- [ ] Next: Phase 2 slice 2c (`provider list`), then `scan`; providers themselves are user-side (D41)
 - [ ] Round 3+: dedup strategy, scheduling, security of user-authored code, testing/CI, license
 
 ## Decisions
@@ -59,6 +59,8 @@ Open risks to grill: scraping ToS per country; deduping the same listing across 
 - **D38 — Datastore contract in core:** `OfferStorePort` lives in `core/ports/store.port.ts` (already datastore-agnostic), joined by `StoreFactory`/`StoreHandle` (open a workspace store + lifecycle) so composition never names a driver. SQLite implements both (`sqliteStoreFactory`); `secondary/store-factory.ts` selects the default, to move into the composition root in 3b. Fixes the leak where the workspace handle exposed the `better-sqlite3` type. `StoreNotInitializedError` is a core error.
 - **D39 — Inbound port + per-concept commands:** `ApplicationPort` (`core/ports/application.port.ts`) is the use-case surface every primary/inbound adapter depends on; it owns the shared result types (`VersionInfo`, `Finding`, `ValidationReport`, `OfferDetail`). `createApplication(root)` in `src/main.ts` (composition root) binds the store factory + workspace reader + services to it. The CLI adapter is split by concept (`cli/commands/{system,offer,...}.ts`) behind a shared `CommandHandler`; `cli/run.ts` only parses, dispatches, prints, and sets the exit code. Fixes `commands.ts` heading toward a god object. Mapper/DTO vocabulary normalized to record (`*Record`, `toDomain`/`toRecord`, `recordId`).
 - **D40 — Provider/adapter vocabulary:** a **provider** is the data source (a `providers.yml` entry). It is realized by an **adapter** whose kind is the mechanism: **process** (runs an external program; `createProcessAdapter`, `process-adapter.ts`, `type: process`) or **module** (TypeScript). The port stays `ProviderPort`. Replaces the earlier "command adapter/provider" naming.
+- **D41 — Providers are user-side; ship no maintained providers:** the repo ships the machinery (ProviderPort, process adapter, registry, `provider test`, providers.yml schema, docs), never provider implementations. A provider — its command/wrapper and config — lives in the user's workspace (`providers.local/`, `config/providers.yml`) and is theirs to write and maintain; scrapers break often (daftlistings needs header patching + stdout redirection). Supersedes the "ship thin example configs" part of D30. Consequence: the process adapter expects the command to emit the interchange on stdout; we do not build a declarative mapping engine — translation is the user's wrapper. The `add-provider` agent flow (D31) is how a user creates one.
+- **D42 — Product skills live in versioned `skills/`:** agent skills shipped with housing-ops sit in a tracked `skills/<name>/SKILL.md` (first: `write-provider`, model-invoked). Kept current with the code; no symlinks or harness shims for now — consumers copy what they want. The personal dev skills under `.agents/` stay gitignored and separate.
 
 ### House rules (2026-10-03)
 

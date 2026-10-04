@@ -53,6 +53,14 @@ cancellation and timeout, a `pace` function that spaces requests, and a `log`
 function. The adapter raises failures; the core validates, normalizes, and
 dead-letters malformed output instead of crashing the run.
 
+## Providers are user-side
+
+This repo ships the **machinery** — the port, the process adapter, the registry,
+`provider test`, and the `providers.yml` schema — not provider
+implementations. A provider (its command plus config) lives in your workspace
+(`providers.local/`, `config/providers.yml`) and is yours to write and
+maintain; scrapers break often. The `add-provider` flow helps you create one.
+
 ## Adapter kinds
 
 **Process adapter (primary).** Runs an external program and reads its **stdout**
@@ -85,6 +93,10 @@ parsed as `Listing`.
   output: jsonl            # jsonl | json
   timeoutMs: 120000
 ```
+
+Illustrative, not shipped: Daft via `daftlistings` needs its empty
+`User-Agent`/`Origin`/`Referer` patched and prints progress to **stdout**, so a
+wrapper must patch headers and send its logs to stderr.
 
 **Module adapter.** TypeScript in `providers.local/`, obeying the same port in
 code, for npm libraries or plain HTTP.

@@ -1,0 +1,3 @@
+interface:
+  display_name: "Write a provider"
+  short_description: "Add a provider that fetches listings from a new source"
