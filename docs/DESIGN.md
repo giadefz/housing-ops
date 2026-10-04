@@ -28,7 +28,20 @@ them with exactly these meanings:
   recommendation + confidence).
 - **digest** — the output of `prefs digest`: explicit prefs plus learned
   signal, the agent's working picture of your taste.
-- **pin** — an approved extension hash recorded in `extensions.yml`.
+- **approval** — a recorded user approval to run an extension, with its file
+  hash in `extensions.yml`. A changed file voids its approval until re-approved.
+- **dwelling** — the physical place. Identity is the normalized address key;
+  universal facts plus country-pack attributes.
+- **offer** — a market sighting of a dwelling. Identity is provider plus
+  listing id; price, status, versions, verdicts.
+- **attributes** — country-specific dwelling facts (BER, Eircode, …),
+  validated against the active country pack schema.
+- **pack** — a country pack: pure attribute schema, key rules, layout
+  mapping, and defaults. No I/O.
+- **validate** — check conformance of the workspace (config, approvals,
+  database, versions) and report findings. Never fixes.
+- **scan** — one full sweep: fetch, normalize, filter, dedupe, store, gate,
+  publish. Noun and verb.
 - **dead-letter** — listings that failed normalization: stored, inspectable,
   never silently dropped.
 - **pushdown** — passing hard profile constraints as provider arguments where
@@ -37,9 +50,9 @@ them with exactly these meanings:
 
 ## The three parts
 
-1. **Core** (`src/`): offer domain, pipeline engine, four ports
-   (`Provider`, `Filter`, `Publisher`, `Storage`) with default adapters.
-   Deterministic, LLM-free, headless-runnable.
+1. **Core** (`src/`): dwelling and offer domains, pipeline engine, five
+   ports (`Provider`, `Filter`, `Store`, `Publisher`, `Clock`) with default
+   adapters. Deterministic, LLM-free, headless-runnable.
 2. **Agent layer** (`AGENTS.md`, skill shims, `agent-flows/`): flow
    definitions the harness drives the core with. No LLM in our process.
 3. **Data** (`config/*.yml`, `data/housing.db`): your profile, your history.
@@ -58,7 +71,7 @@ The full per-command contract is `docs/design/api.md`. The rules every caller
 relies on:
 
 - The surface is **versioned**. `housing-ops version` reports
-  `{ core, api }`; `doctor` checks compatibility on every session start and
+  `{ core, api }`; `validate` checks compatibility on every session start and
   says exactly what to do when versions drift.
 - Every command prints one JSON envelope to stdout:
   `{ ok: true, version, data }` or `{ ok: false, version, error: { code,
@@ -81,7 +94,7 @@ Reach each doc on exactly these branches:
 - **Storage** (`docs/design/storage.md`): tables; migrations; what lives in
   YAML vs the DB.
 - **Config** (`docs/design/config.md`): editing the profile; provider and
-  pipeline files; pinning an extension.
+  pipeline files; approving an extension.
 - **API** (`docs/design/api.md`): any command's exact JSON in/out.
 - **Publishers** (`docs/design/publishers.md`): adding a publisher; event
   semantics; the webhook.
@@ -92,11 +105,11 @@ Reach each doc on exactly these branches:
 
 Phases run in order; each phase's criterion is the gate to the next.
 
-- **Phase 0 — scaffold.** Layout per README; strict TS + zod; every command
-  as a function in `src/api` returning the envelope; `src/cli` a thin argv
-  wrapper; `doctor` + `version` working.
-  Done when: the build passes, `doctor` reports missing config without
-  crashing, and adding a command means one api function plus one argv line.
+- **Phase 0 — scaffold.** Layout per README; strict TS + zod; use cases as
+  functions in `core/services` returning domain results; the CLI adapter in
+  `adapters/primary/cli` builds the envelope; `validate` + `version` working.
+  Done when: the build passes, `validate` reports missing config without
+  crashing, and adding a command means one service function plus one argv line.
 - **Phase 1 — storage + offer.** Schema and migrations per `storage.md`;
   immutable versioned snapshots; dead-letter table; `offer get` working.
   Done when: all documented tables exist, migrations apply cleanly on an

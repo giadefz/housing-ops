@@ -37,10 +37,22 @@ Open risks to grill: scraping ToS per country; deduping the same listing across 
 - [x] README.md written (vision doc for humans, ahead of design doc + ADRs)
 - [x] ADRs 0001–0007 written to `docs/adr/`
 - [x] Phase 0 scaffold done: build passes, 8/8 tests green, `doctor` reports missing config gracefully
+- [x] GitHub repo: private `giadefz/housing-ops`, initial commit `e1f116a` pushed to `main` (identity: Gianluca + noreply email, repo-local)
+- [x] Restructure + Dwelling/Offer split + country packs (D34–D35)
 - [ ] Next: Phase 1 (storage + offer)
 - [ ] Round 3+: dedup strategy, scheduling, security of user-authored code, testing/CI, license
 
 ## Decisions
+
+### Restructure (2026-10-04)
+
+- **D34 — Restructure (skill layout, functional paradigm):** `src/core/{domain,ports,services}` + `src/adapters/{primary,secondary}` + droppable top-level extension dirs (`providers/`, `filters/`, `publishers/`, `storage/`, `countries/` + `.local/`). Services are function modules taking data (functional DI — classes only where earned); core imports nothing but zod (fs/yaml/crypto/path live in adapters); the envelope is built in the CLI adapter (wire contract unchanged); `doctor` fully removed → `validate` / `validateWorkspace()` / `ValidationReport` / `findings`; approval replaces pin everywhere (`approvals:` key, `verifyApproval`, `currentHashes`); `src/main.ts` deferred to Phase 1 (first real wiring). Amends D28 (layout) and D25 (pins → approvals).
+- **D35 — Dwelling/Offer split + country packs:** `Dwelling` (physical place, address-key identity, universal facts + pack-validated attributes) vs `Offer` (market sighting, provider identity, price/status/versions/verdicts). New extension axis `countries/` (pure packs: attribute schema, key rules, layout mapping, defaults); Ireland first. BER-style filters generalize to a key/operator/value `attribute` filter. Amends D16 (FilterPort.evaluate gains dwelling) and D17 (schema splits into Dwelling + Offer; rooms optional, fail-open).
+
+### House rules (2026-10-03)
+
+- **D32 — House rules:** `clean-code` + `typescript-clean-code-cookbook` bind every code change (full texts in the author's personal harness under `.agents/skills/`; repo-committed summary in `docs/HOUSE-RULES.md`). Prettier enforces style (`useTabs: true, tabWidth: 4`); `format:check`, build, and tests stay green. Correction logged: the TS skill is `typescript-clean-code-cookbook`, not `typescript-steering`.
+- **D33 — Naming + paradigm:** "doctor" removed entirely, command included — replaced by `validate` / `validateWorkspace()` / `ValidationReport` / `findings: Finding[]` (validate = check conformance against requirements; `ensure`/`repair` rejected because the command reports and never fixes; `checkHealth` rejected as abstract-object). Classes are NOT mandatory: what matters is hexagonal structure (ports, adapters, dependency direction, composition root); our functional style (functions + deps objects as functional DI) stands, classes only where earned.
 
 ### Round 4 (2026-10-03)
 

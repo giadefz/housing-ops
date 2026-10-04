@@ -117,17 +117,22 @@ keepers, and shows you the shortlist.
 ## Layout
 
 ```text
-src/core/        offer domain + pipeline engine (pure, tested)
-src/api/         versioned command surface the interfaces drive
-src/cli/         thin `housing-ops` wrapper (JSON in/out)
-providers/       bundled provider adapters      (+ providers.local/ for yours)
-filters/         bundled filters                (+ filters.local/ for yours)
-publishers/      bundled publishers             (+ publishers.local/ for yours)
-storage/         storage adapters (SQLite default)
-agent-flows/     agent flow definitions (onboarding, triage, authoring, …)
-config/          profile.yml, pipeline.yml, providers.yml, extensions.yml
-data/            housing.db (gitignored) — your history lives here
-docs/            decisions, ADRs, design notes
+src/
+  main.ts                # composition root (from Phase 1: first real wiring)
+  core/
+    domain/              # dwelling, offer, listing, profile… — pure, zod only
+    ports/               # provider, filter, store, publisher, clock contracts
+    services/            # use cases: validate, scan, verdicts, prefs…
+  adapters/
+    primary/cli/         # argv, dispatch, envelope printing
+    secondary/           # file reading, command runner, registries
+  config-schema.ts       # our own config files' contracts
+  errors.ts
+providers/ filters/ publishers/ storage/ countries/   # droppable adapters
+providers.local/ filters.local/ …                     # yours (approved + hash-checked)
+config/                  # profile.yml, pipeline.yml, providers.yml, extensions.yml
+data/                    # housing.db (gitignored) — your history lives here
+docs/                    # decisions, ADRs, design notes
 tests/
 ```
 

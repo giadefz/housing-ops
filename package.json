@@ -8,12 +8,14 @@
     "node": ">=20"
   },
   "bin": {
-    "housing-ops": "./dist/cli/index.js"
+    "housing-ops": "./dist/adapters/primary/cli/commands.js"
   },
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
-    "housing-ops": "node ./dist/cli/index.js"
+    "format": "prettier --write src tests countries",
+    "format:check": "prettier --check src tests countries",
+    "housing-ops": "node ./dist/adapters/primary/cli/commands.js"
   },
   "dependencies": {
     "js-yaml": "^4.1.0",
@@ -22,6 +24,7 @@
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^24.0.0",
+    "prettier": "^3.9.9",
     "typescript": "^5.9.0",
     "vitest": "^3.2.0"
   }

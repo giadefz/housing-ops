@@ -1,17 +1,18 @@
-# Command surface — `src/api`, `src/cli`
+# Command surface — use cases plus the CLI adapter
 
-Versioned use-case surface. `src/api` exports one async function per command;
-`src/cli` maps argv to those functions and prints the envelope. Future
-interfaces (REST, UI) call the same functions.
+Versioned use-case surface. `core/services` exports one function per command
+(taking data, returning domain results); `adapters/primary/cli` maps argv to
+those functions and prints the envelope. Future interfaces (REST, UI) call
+the same functions and build the same envelope.
 
 `housing-ops version` → `{ core: "0.1.0", api: 1 }`. Breaking the envelope
-or any command's `data` shape bumps `api`; `doctor` refuses to run flows
+or any command's `data` shape bumps `api`; `validate` refuses to run flows
 against a mismatched api version and tells the user to update.
 
 | Command | Input | `data` on success |
 |---|---|---|
 | `setup [--country ie --market rent]` | flags | `{ config: {profile, pipeline, providers}, db }` — paths written |
-| `doctor` | — | `{ checks: [{ name, ok, detail? }] }` — config, schemas, pins, providers, api compat |
+| `validate` | — | `{ findings: [{ name, ok, detail? }] }` — config, schemas, approvals, database, api compat |
 | `version` | — | `{ core, api }` |
 | `scan [--provider id] [--dry-run]` | flags | `{ run_id, fetched, normalized, passed, failed, skipped, stored, dead_letter }` |
 | `queue [--status pending] [--limit n]` | flags | `{ offers: [OfferSummary] }` — compact rows, not full offers |

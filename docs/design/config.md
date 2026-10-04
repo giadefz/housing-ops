@@ -15,7 +15,8 @@ each failure with the file, the path, and the fix.
 - **`providers.yml`** — provider entries (module or command, `enabled`,
   markets, pacing overrides, `constraints` for pushdown, `recheck_hours`)
   plus publisher entries (`publishers.md`).
-- **`extensions.yml`** — trust pins for user-authored code:
+- **`extensions.yml`** — approvals for user-authored code:
   `{ id, kind: filter|provider|publisher|storage, path, sha256,
-  approved_at }`. A pinned file whose hash changed is refused at load with
-  the exact re-approval command. Nothing in `.local/` runs unpinned.
+  approved_at }` under `approvals:`. A file whose hash changed is refused
+  at load with the exact re-approval command. Nothing in `.local/` runs
+  unapproved.
