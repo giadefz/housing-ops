@@ -8,19 +8,23 @@ import {
 } from "../../core/config-schema.js";
 import type { ConfigFile } from "../../core/config-schema.js";
 import type { WorkspaceInput } from "../../core/services/validate.service.js";
+import { readSchemaVersion, SCHEMA_VERSION } from "./storage/sqlite/migrate.js";
 
 /** Workspace locations. The root is the repo checkout or HOUSING_OPS_ROOT. */
 export function resolveRoot(): string {
 	return process.env.HOUSING_OPS_ROOT ?? process.cwd();
 }
 
-/** Reads every file validation needs: raw config texts, current file hashes, database presence. */
+/** Reads every file validation needs: raw config texts, current file hashes, database presence and schema version. */
 export function readWorkspace(root: string): WorkspaceInput {
 	const extensionsText = readText(configPath(root, "extensions.yml"));
+	const file = databasePath(root);
 	return {
 		configTexts: readConfigs(root),
 		currentHashes: readCurrentHashes(root, extensionsText),
-		databaseExists: fs.existsSync(databasePath(root)),
+		databaseExists: fs.existsSync(file),
+		schemaVersion: readSchemaVersion(file),
+		expectedSchemaVersion: SCHEMA_VERSION,
 	};
 }
 

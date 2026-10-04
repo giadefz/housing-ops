@@ -11,16 +11,18 @@ import { errorMessage } from "../errors.js";
 import { API_VERSION } from "../version.js";
 import type { Finding, ValidationReport } from "../ports/application.port.js";
 
-/** Everything validation reads: raw config texts, current file hashes, database presence. */
+/** Everything validation reads: raw config texts, current file hashes, database presence and schema version. */
 export interface WorkspaceInput {
 	configTexts: Record<ConfigFile, string | null>;
 	currentHashes: Record<string, string | null>;
 	databaseExists: boolean;
+	schemaVersion: number | null;
+	expectedSchemaVersion: number;
 }
 
 const SETUP_HINT = "run housing-ops setup";
 
-/** Checks a workspace snapshot for config, approval, database, and version problems. Pure: reads nothing, every input arrives in WorkspaceInput. */
+/** Checks a workspace snapshot for config, approval, database, schema, and version problems. Pure: reads nothing, every input arrives in WorkspaceInput. */
 export function validateWorkspace(input: WorkspaceInput): ValidationReport {
 	return {
 		findings: [
@@ -30,6 +32,7 @@ export function validateWorkspace(input: WorkspaceInput): ValidationReport {
 				input.currentHashes,
 			),
 			checkDatabase(input.databaseExists),
+			checkSchemaVersion(input),
 			checkApiVersion(),
 		],
 	};
@@ -151,4 +154,25 @@ function checkDatabase(databaseExists: boolean): Finding {
 
 function checkApiVersion(): Finding {
 	return { name: "api", ok: true, detail: `api ${API_VERSION}` };
+}
+
+function checkSchemaVersion(input: WorkspaceInput): Finding {
+	if (input.schemaVersion === null) {
+		return { name: "schema", ok: true, detail: "no database yet" };
+	}
+	if (input.schemaVersion === input.expectedSchemaVersion) {
+		return { name: "schema", ok: true, detail: `v${input.schemaVersion}` };
+	}
+	return {
+		name: "schema",
+		ok: false,
+		detail: `database schema v${input.schemaVersion} vs core v${input.expectedSchemaVersion} — ${schemaFixHint(input)}`,
+	};
+}
+
+function schemaFixHint(input: WorkspaceInput): string {
+	const behind =
+		input.schemaVersion !== null &&
+		input.schemaVersion < input.expectedSchemaVersion;
+	return behind ? "open the workspace to migrate" : "update housing-ops";
 }

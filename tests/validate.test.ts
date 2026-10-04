@@ -14,6 +14,8 @@ function emptyInput(): WorkspaceInput {
 		},
 		currentHashes: {},
 		databaseExists: false,
+		schemaVersion: null,
+		expectedSchemaVersion: 1,
 	};
 }
 
@@ -129,5 +131,44 @@ describe("validate extension pins", () => {
 			(candidate) => candidate.name === "extensions",
 		);
 		expect(finding?.ok).toBe(false);
+	});
+});
+
+describe("schema version", () => {
+	function schemaFinding(input: WorkspaceInput): {
+		ok: boolean;
+		detail?: string;
+	} {
+		const finding = validateWorkspace(input).findings.find(
+			(candidate) => candidate.name === "schema",
+		);
+		if (finding === undefined) throw new Error("no schema finding");
+		return finding;
+	}
+
+	it("passes when there is no database yet", () => {
+		expect(schemaFinding(emptyInput()).ok).toBe(true);
+	});
+	it("passes when the database schema matches the core", () => {
+		const input = emptyInput();
+		input.databaseExists = true;
+		input.schemaVersion = 1;
+		expect(schemaFinding(input).ok).toBe(true);
+	});
+	it("fails when the database schema is behind", () => {
+		const input = emptyInput();
+		input.databaseExists = true;
+		input.schemaVersion = 0;
+		const finding = schemaFinding(input);
+		expect(finding.ok).toBe(false);
+		expect(finding.detail).toMatch(/migrate/);
+	});
+	it("fails when the database schema is ahead", () => {
+		const input = emptyInput();
+		input.databaseExists = true;
+		input.schemaVersion = 2;
+		const finding = schemaFinding(input);
+		expect(finding.ok).toBe(false);
+		expect(finding.detail).toMatch(/update housing-ops/);
 	});
 });
