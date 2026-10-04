@@ -40,7 +40,7 @@ Open risks to grill: scraping ToS per country; deduping the same listing across 
 - [x] GitHub repo: private `giadefz/housing-ops`, initial commit `e1f116a` pushed to `main` (identity: Gianluca + noreply email, repo-local)
 - [x] Restructure + Dwelling/Offer split + country packs (D34–D35), committed as `a765987` and pushed to `main`
 - [x] Phase 1 slice 1 inc. per-entity tables (D36), committed as `a62e992` and pushed to `main`
-- [x] Phase 1 slice 2 + DAO reshape (D37): dwellings/offers/versions/verdicts/analyses/interactions/runs/market-events + queue + port factory (52 tests)
+- [x] Phase 1 slice 2 + DAO reshape (D37): dwellings/offers/versions/verdicts/analyses/interactions/runs/market-events + queue + port factory (52 tests), committed as `e9a9f11` and pushed to `main`
 - [ ] Next: Phase 1 slice 3 (`offer get` command, store wiring, validate schema check)
 - [ ] Round 3+: dedup strategy, scheduling, security of user-authored code, testing/CI, license
 
