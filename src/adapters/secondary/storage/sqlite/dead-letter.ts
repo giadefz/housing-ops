@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import type Database from "better-sqlite3";
+import type { DeadLetterEntry } from "../../../../core/ports/store.port.js";
 import type { TableDefinition } from "./migrate.js";
 
 /** Dead-letter table. Listings that failed normalization, never silently dropped. */
@@ -16,15 +17,6 @@ CREATE TABLE dead_letter (
 	received_at TEXT NOT NULL
 );`,
 };
-
-/** A listing that failed normalization, kept for inspection. */
-export interface DeadLetterEntry {
-	runId: string;
-	provider: string;
-	payload: unknown;
-	error: string;
-	receivedAt: string;
-}
 
 /** Appends a dead-letter entry and returns its id. */
 export function recordDeadLetter(

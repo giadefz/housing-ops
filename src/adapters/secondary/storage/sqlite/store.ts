@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import type { OfferStorePort } from "../../../../core/ports/store.port.js";
 import { recordAnalysis } from "./analysis.js";
+import { recordDeadLetter } from "./dead-letter.js";
 import { findDwellingByAddressKey, saveDwelling } from "./dwelling.js";
 import { recordInteraction } from "./interaction.js";
 import { markMarketOutcome } from "./market-event.js";
@@ -41,6 +42,9 @@ export function createSqliteStore(database: Database.Database): OfferStorePort {
 		listQueue: async (status, limit) => listQueue(database, status, limit),
 		startRun: (provider) => startRun(database, provider),
 		finishRun: (runId, stats) => finishRun(database, runId, stats),
+		recordDeadLetter: async (entry) => {
+			recordDeadLetter(database, entry);
+		},
 		markMarketOutcome: (offerId, outcome, observedAt) =>
 			markMarketOutcome(database, offerId, outcome, observedAt),
 	};

@@ -5,6 +5,7 @@ import { toFailure } from "./failures.js";
 import { help } from "./commands/help.js";
 import { offerCommands } from "./commands/offer.js";
 import { providerCommands } from "./commands/provider.js";
+import { scanCommands } from "./commands/scan.js";
 import { systemCommands } from "./commands/system.js";
 import type { CommandHandler } from "./commands/types.js";
 
@@ -12,6 +13,7 @@ const commandHandlers: Record<string, CommandHandler> = {
 	...systemCommands,
 	...offerCommands,
 	...providerCommands,
+	...scanCommands,
 };
 
 /** Drives the application for one CLI invocation: parse, dispatch, print, set the exit code. */

@@ -1,7 +1,6 @@
 import { spawn } from "node:child_process";
 import { errorMessage } from "../../../core/errors/message.js";
 import { ProviderError } from "../../../core/errors/provider.js";
-import { ListingSchema, type Listing } from "../../../core/domain/listing.js";
 import {
 	ProviderEntrySchema,
 	type ProviderEntry,
@@ -14,7 +13,7 @@ import type {
 /** How a process's stdout carries listings. */
 export type OutputFormat = "jsonl" | "json";
 
-/** Runs an external process as a provider: its stdout is the listing interchange. */
+/** Runs an external process as a provider: its stdout carries the listing interchange. */
 export function createProcessAdapter(rawEntry: unknown): ProviderPort {
 	const entry: ProviderEntry = ProviderEntrySchema.parse(rawEntry);
 	return {
@@ -24,30 +23,26 @@ export function createProcessAdapter(rawEntry: unknown): ProviderPort {
 		async *fetch(
 			_config: unknown,
 			context: FetchContext,
-		): AsyncIterable<Listing> {
+		): AsyncIterable<unknown> {
 			await context.pace();
 			context.log(
 				`running ${entry.command} ${entry.args.join(" ")}`.trim(),
 			);
 			const output = await runProcess(entry, context);
-			yield* parseListingOutput(output, entry.output, entry.id);
+			yield* parseRecords(output, entry.output, entry.id);
 		},
 	};
 }
 
-/** Parses process output into validated listings. Blank lines are skipped. */
-export function parseListingOutput(
+/** Parses process output into raw records. Blank lines are skipped; the core validates them. */
+export function parseRecords(
 	text: string,
 	output: OutputFormat,
 	provider: string,
-): Listing[] {
-	const records =
-		output === "jsonl"
-			? parseJsonLines(text, provider)
-			: parseJsonArray(text, provider);
-	return records.map((record, index) =>
-		validateListing(record, provider, index),
-	);
+): unknown[] {
+	return output === "jsonl"
+		? parseJsonLines(text, provider)
+		: parseJsonArray(text, provider);
 }
 
 function parseJsonLines(text: string, provider: string): unknown[] {
@@ -77,22 +72,6 @@ function parseJson(text: string, provider: string): unknown {
 			error,
 		);
 	}
-}
-
-function validateListing(
-	record: unknown,
-	provider: string,
-	index: number,
-): Listing {
-	const parsed = ListingSchema.safeParse(record);
-	if (!parsed.success) {
-		throw new ProviderError(
-			provider,
-			`record ${index} failed interchange: ${parsed.error.message}`,
-			parsed.error,
-		);
-	}
-	return parsed.data;
 }
 
 function runProcess(

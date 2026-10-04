@@ -48,10 +48,11 @@ ways to do it, both leaving the third-party tool untouched:
 ## The port
 
 A provider has an id, a country, the markets it serves, and a `fetch` that
-streams listings. The core hands `fetch` a small context: an abort signal for
-cancellation and timeout, a `pace` function that spaces requests, and a `log`
-function. The adapter raises failures; the core validates, normalizes, and
-dead-letters malformed output instead of crashing the run.
+streams **raw records**. The core hands `fetch` a small context: an abort
+signal for cancellation and timeout, a `pace` function that spaces requests,
+and a `log` function. The adapter raises failures; the core validates each
+record against the interchange and normalizes it — a bad record goes to
+dead-letter while the run continues.
 
 ## Providers are user-side
 

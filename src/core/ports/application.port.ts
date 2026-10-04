@@ -41,6 +41,13 @@ export interface ProviderTestResult {
 	sample: Listing[];
 }
 
+/** The result of a scan run. */
+export interface ScanResult {
+	fetched: number;
+	stored: number;
+	deadLettered: number;
+}
+
 /** The use-case surface every inbound (primary) adapter drives. Inbound adapters depend on this alone. */
 export interface ApplicationPort {
 	getVersion(): VersionInfo;
@@ -48,4 +55,5 @@ export interface ApplicationPort {
 	getOffer(id: string): Promise<OfferDetail>;
 	listProviders(): ProviderSummary[];
 	testProvider(id: string): Promise<ProviderTestResult>;
+	scan(providerId?: string): Promise<ScanResult>;
 }

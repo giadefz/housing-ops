@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createProcessAdapter } from "../src/adapters/secondary/providers/process-adapter.js";
+import { ProviderError } from "../src/core/errors/provider.js";
 import { testProvider } from "../src/core/services/provider.service.js";
 
 function record(id: string): string {
@@ -37,6 +38,12 @@ describe("testProvider", () => {
 			"a",
 			"b",
 		]);
+	});
+	it("fails on a record that breaks the interchange", async () => {
+		const payload = `${JSON.stringify({ listing_id: "x" })}\n`;
+		await expect(
+			testProvider({ provider: fakeProvider(payload), cap: 5 }),
+		).rejects.toBeInstanceOf(ProviderError);
 	});
 	it("propagates provider errors", async () => {
 		const provider = createProcessAdapter({

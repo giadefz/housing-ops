@@ -2,11 +2,15 @@ import {
 	buildProviders,
 	listProviderSummaries,
 } from "./adapters/secondary/providers/registry.js";
+import type { CountryPack } from "./core/domain/country-pack.js";
 import { ProviderNotFoundError } from "./core/errors/provider.js";
 import type { ApplicationPort } from "./core/ports/application.port.js";
+import type { ClockPort } from "./core/ports/clock.port.js";
+import type { ProviderPort } from "./core/ports/provider.port.js";
 import type { OfferStorePort, StoreFactory } from "./core/ports/store.port.js";
 import { getOffer } from "./core/services/offer.service.js";
 import { testProvider as runProviderTest } from "./core/services/provider.service.js";
+import { scan } from "./core/services/scan.service.js";
 import {
 	validateWorkspace,
 	type WorkspaceInput,
@@ -19,6 +23,8 @@ const PROVIDER_TEST_CAP = 5;
 export interface ApplicationDependencies {
 	storeFactory: StoreFactory;
 	readWorkspace: (root: string) => WorkspaceInput;
+	clock: ClockPort;
+	pack: CountryPack;
 }
 
 /** Wires the given adapters into the application surface inbound adapters drive. */
@@ -26,7 +32,7 @@ export function createApplication(
 	root: string,
 	dependencies: ApplicationDependencies,
 ): ApplicationPort {
-	const { storeFactory, readWorkspace } = dependencies;
+	const { storeFactory, readWorkspace, clock, pack } = dependencies;
 	const withStore = async <T>(
 		use: (store: OfferStorePort) => Promise<T>,
 	): Promise<T> => {
@@ -37,21 +43,37 @@ export function createApplication(
 			handle.close();
 		}
 	};
+	const providersText = () =>
+		readWorkspace(root).configTexts["providers.yml"];
 	return {
 		getVersion,
 		validateWorkspace: () => validateWorkspace(readWorkspace(root)),
 		getOffer: (id) => withStore((store) => getOffer(store, id)),
-		listProviders: () =>
-			listProviderSummaries(
-				readWorkspace(root).configTexts["providers.yml"],
-			),
+		listProviders: () => listProviderSummaries(providersText()),
 		testProvider: async (id) => {
-			const providers = buildProviders(
-				readWorkspace(root).configTexts["providers.yml"],
-			);
-			const provider = providers.get(id);
+			const provider = buildProviders(providersText()).get(id);
 			if (provider === undefined) throw new ProviderNotFoundError(id);
 			return runProviderTest({ provider, cap: PROVIDER_TEST_CAP });
 		},
+		scan: (providerId) =>
+			withStore((store) => {
+				const providers = selectProviders(
+					buildProviders(providersText()),
+					providerId,
+				);
+				if (providerId !== undefined && providers.length === 0) {
+					throw new ProviderNotFoundError(providerId);
+				}
+				return scan({ providers, store, pack, clock });
+			}),
 	};
+}
+
+function selectProviders(
+	providers: Map<string, ProviderPort>,
+	providerId: string | undefined,
+): ProviderPort[] {
+	return [...providers.values()].filter(
+		(provider) => providerId === undefined || provider.id === providerId,
+	);
 }

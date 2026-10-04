@@ -27,6 +27,16 @@ with each other, ask.
 - Exception: TSDoc over interface definitions (and concept type aliases) —
   one to two lines defining the concept.
 
+## Design
+
+- **Functions return values.** A function whose only job is a side effect,
+  returning nothing, hides its outcome and resists testing. Return what it
+  produced — a verdict, a count, a new value. I/O functions still return
+  what they did.
+- **No mutation.** Build new values (`{ ...value, field }`, `reduce`) and
+  pass them on; do not mutate parameters or shared objects. A local fold
+  accumulator is the one pragmatic exception.
+
 ## Naming
 
 - Command words (what the user types) are affordances: short, borrowing

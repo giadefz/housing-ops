@@ -26,6 +26,15 @@ export interface RunStats {
 	stored: number;
 }
 
+/** A listing that failed normalization, kept for inspection. */
+export interface DeadLetterEntry {
+	runId: string;
+	provider: string;
+	payload: unknown;
+	error: string;
+	receivedAt: string;
+}
+
 /** Persists and queries offers. Implemented by storage adapters. */
 export interface OfferStorePort {
 	saveDwelling(dwelling: Dwelling): Promise<void>;
@@ -47,6 +56,7 @@ export interface OfferStorePort {
 	listQueue(status: OfferStatus, limit: number): Promise<OfferSummary[]>;
 	startRun(provider: string): Promise<string>;
 	finishRun(runId: string, stats: RunStats): Promise<void>;
+	recordDeadLetter(entry: DeadLetterEntry): Promise<void>;
 	markMarketOutcome(
 		offerId: string,
 		outcome: MarketOutcome,

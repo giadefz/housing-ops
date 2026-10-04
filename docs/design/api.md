@@ -21,7 +21,7 @@ against a mismatched api version and tells the user to update.
 | `setup [--country ie --market rent]` | flags | `{ config: {profile, pipeline, providers}, db }` — paths written |
 | `validate` | — | `{ findings: [{ name, ok, detail? }] }` — config, schemas, approvals, database, api compat |
 | `version` | — | `{ core, api }` |
-| `scan [--provider id] [--dry-run]` | flags | `{ run_id, fetched, normalized, passed, failed, skipped, stored, dead_letter }` |
+| `scan [--provider id]` | flags | `{ fetched, stored, deadLettered }` |
 | `queue [--status pending] [--limit n]` | flags | `{ offers: [OfferSummary] }` — compact rows, not full offers |
 | `offer get <id>` | id | `{ offer, verdicts }` — the offer carries versions, analyses, interactions |
 | `verdict set <id> --tier triage\|analyse --verdict pass\|shortlist\|reject\|hold --reason ... [--pros ...] [--cons ...] [--price-assessment ...] [--red-flags ...] [--recommendation ...] [--confidence 0-1]` | id + fields | `{ analysis_id }` |
