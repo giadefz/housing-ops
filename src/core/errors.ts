@@ -10,3 +10,11 @@ export class StoreNotInitializedError extends Error {
 		this.name = "StoreNotInitializedError";
 	}
 }
+
+/** Thrown when a provider cannot fetch or emits invalid interchange. */
+export class ProviderError extends Error {
+	constructor(provider: string, reason: string) {
+		super(`provider ${provider}: ${reason}`);
+		this.name = "ProviderError";
+	}
+}
