@@ -132,7 +132,7 @@ Phases run in order; each phase's criterion is the gate to the next.
   recorded, and every built-in passes unit tests against fixture offers.
 - **Phase 4 — dedup + statuses + recheck.** Cross-provider and history
   dedup; relist emits `offer.updated`; status transitions; 48h recheck;
-  delisting flips to `gone`.
+  delisting flips to `gone`. Plan: `docs/plans/phase-4.md`.
   Done when: re-running `scan` creates no duplicates, a delisted listing
   flips to `gone`, and a price change emits `offer.updated`.
 - **Phase 5 — queue + prefs.** `queue`, `verdict set`, `interact`, `prefs`

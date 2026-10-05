@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { budgetFilter } from "../src/core/filters/budget.js";
 import { bedroomsFilter } from "../src/core/filters/bedrooms.js";
 import { locationFilter } from "../src/core/filters/location.js";
+import { sizeFilter } from "../src/core/filters/size.js";
+import { typeFilter } from "../src/core/filters/type.js";
 import type { Dwelling } from "../src/core/domain/dwelling.js";
 import type { Offer } from "../src/core/domain/offer.js";
 import type { Profile } from "../src/core/schemas/profile.js";
@@ -144,5 +146,31 @@ describe("built-in filters", () => {
 				input({ profile: profile({ areas: ["Cork"] }) }),
 			).outcome,
 		).toBe("fail");
+	});
+	it("type: passes when the layout is allowed, fails otherwise", () => {
+		expect(
+			typeFilter.evaluate(
+				input({ profile: profile({ layouts: ["apartment"] }) }),
+			).outcome,
+		).toBe("pass");
+		expect(
+			typeFilter.evaluate(
+				input({ profile: profile({ layouts: ["house"] }) }),
+			).outcome,
+		).toBe("fail");
+	});
+	it("size: passes when large enough, skips when the size is unknown", () => {
+		expect(
+			sizeFilter.evaluate(
+				input({
+					dwelling: dwelling({ size: { value: 85, unit: "m2" } }),
+					profile: profile({ minSizeM2: 60 }),
+				}),
+			).outcome,
+		).toBe("pass");
+		expect(
+			sizeFilter.evaluate(input({ profile: profile({ minSizeM2: 60 }) }))
+				.outcome,
+		).toBe("skip");
 	});
 });

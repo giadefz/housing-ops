@@ -44,11 +44,11 @@ Disabling a filter is a config edit, never a code change.
 
 ## Built-ins (v1, provisional pending real data)
 
-location, budget, type, bedrooms, size_m2, floor, building age, BER,
-features (must-have / must-not-have), furnishing, lease/tenure,
+location, budget, type, bedrooms, size_m2, furnishing, features
+(must-have / must-not-have), BER. Floor, building age, lease/tenure,
 listing-health (deterministic red flags → marks `suspicious`, never
-auto-fails), commute (distance-based). Schools/pets and anything requiring
-taste live behind the gate, not here.
+auto-fails), and commute (distance-based) are deferred. Schools/pets and
+anything requiring taste live behind the gate, not here.
 
 ## Authoring flow
 
