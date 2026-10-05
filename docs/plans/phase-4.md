@@ -67,3 +67,17 @@ Done when: a second scan with a changed price produces exactly one
   to Phase 6 (publishers) and only detect in Phase 4.
 - **Filtered-out status.** A filtered-out offer currently stays `seen`; decide
   whether it should carry its own status.
+
+## Real-data notes (local `.lab` run against Daft)
+
+- A Daft wrapper must patch `daftlistings`' headers (`User-Agent`/`Origin`/
+  `Referer`), send its stdout chatter to stderr, read coordinates from the raw
+  record (the `.latitude` accessor throws when a listing has no `point`), and
+  omit absent fields (`"ber": null` fails the pack enum).
+- Re-scanning 60 live listings produced no duplicates (offers and versions
+  stayed put) — dedup-lite holds on real data.
+- **Dwelling identity risk.** 60 offers collapsed to 50 dwellings: several
+  PRS-building listings share a title with no unit number, so distinct units
+  merge into one dwelling. Decide whether dwelling identity needs more than the
+  address text.
+

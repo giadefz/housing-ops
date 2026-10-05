@@ -8,3 +8,7 @@ config/*.yml
 # personal harness setup — not part of the product
 .agents/
 skills-lock.json
+# local experiments — never committed
+.lab/
+*.local/*
+!*.local/.gitkeep
