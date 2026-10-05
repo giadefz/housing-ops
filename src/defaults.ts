@@ -6,7 +6,9 @@ import { irelandPack } from "./countries/ie/pack.js";
 import type { ApplicationPort } from "./core/ports/application.port.js";
 
 /** Builds the application with the default (bundled) adapters. */
-export function createDefaultApplication(root: string): ApplicationPort {
+export function createDefaultApplication(
+	root: string,
+): Promise<ApplicationPort> {
 	return createApplication(root, {
 		storeFactory,
 		readWorkspace,

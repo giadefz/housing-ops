@@ -1,5 +1,6 @@
 import {
 	buildFilterStages,
+	collectFilters,
 	listFilters,
 } from "./adapters/secondary/filters/registry.js";
 import { parseProfile } from "./adapters/secondary/profile.js";
@@ -11,8 +12,10 @@ import type { CountryPack } from "./core/domain/country-pack.js";
 import { ProviderNotFoundError } from "./core/errors/provider.js";
 import type {
 	ApplicationPort,
+	ScanResult,
 } from "./core/ports/application.port.js";
 import type { ClockPort } from "./core/ports/clock.port.js";
+import type { FilterPort } from "./core/ports/filter.port.js";
 import type { ProviderPort } from "./core/ports/provider.port.js";
 import type { OfferStorePort, StoreFactory } from "./core/ports/store.port.js";
 import { getOffer } from "./core/services/offer.service.js";
@@ -38,22 +41,26 @@ export interface ApplicationDependencies {
 }
 
 /** Wires the given adapters into the application surface inbound adapters drive. */
-export function createApplication(
+export async function createApplication(
 	root: string,
 	dependencies: ApplicationDependencies,
-): ApplicationPort {
+): Promise<ApplicationPort> {
 	const { storeFactory, readWorkspace, clock, pack } = dependencies;
 	const workspace = readWorkspace(root);
 	const providersText = workspace.configTexts["providers.yml"];
 	const pipelineText = workspace.configTexts["pipeline.yml"];
 	const profileText = workspace.configTexts["profile.yml"];
+	const filters = await collectFilters(
+		root,
+		workspace.configTexts["extensions.yml"],
+	);
 	return {
 		getVersion,
 		validateWorkspace: () => validateWorkspace(workspace),
 		getOffer: (id) =>
 			withStore(storeFactory, root, (store) => getOffer(store, id)),
 		listProviders: () => listProviderSummaries(providersText),
-		listFilters: () => listFilters(pipelineText, pack.code),
+		listFilters: () => listFilters(pipelineText, pack.code, filters),
 		testProvider: (id) => runProviderTest(providerTrial(providersText, id)),
 		scan: (providerId) =>
 			withStore(storeFactory, root, (store) =>
@@ -65,6 +72,7 @@ export function createApplication(
 							profileText,
 							pack,
 							clock,
+							filters,
 						},
 						providerId,
 						store,
@@ -103,6 +111,7 @@ interface ScanInputs {
 	profileText: string | null;
 	pack: CountryPack;
 	clock: ClockPort;
+	filters: Map<string, FilterPort>;
 }
 
 function scanDependencies(
@@ -110,7 +119,8 @@ function scanDependencies(
 	providerId: string | undefined,
 	store: OfferStorePort,
 ): ScanDependencies {
-	const { providersText, pipelineText, profileText, pack, clock } = inputs;
+	const { providersText, pipelineText, profileText, pack, clock, filters } =
+		inputs;
 	const providers = selectProviders(
 		buildProviders(providersText),
 		providerId,
@@ -124,7 +134,7 @@ function scanDependencies(
 		pack,
 		clock,
 		profile: parseProfile(profileText),
-		filters: buildFilterStages(pipelineText, pack.code),
+		filters: buildFilterStages(pipelineText, pack.code, filters),
 	};
 }
 

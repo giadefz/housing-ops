@@ -5,6 +5,7 @@ import {
 	listFilters,
 } from "../src/adapters/secondary/filters/registry.js";
 import { ConfigError } from "../src/core/errors/config.js";
+import { bundledFilters } from "../src/core/filters/index.js";
 import type { FilterPort } from "../src/core/ports/filter.port.js";
 
 const valid = `
@@ -39,7 +40,7 @@ describe("isFilterAvailable", () => {
 
 describe("listFilters", () => {
 	it("lists stages, marking unknown ids unavailable", () => {
-		expect(listFilters(valid, "ie")).toEqual([
+		expect(listFilters(valid, "ie", bundledFilters)).toEqual([
 			{ id: "budget", enabled: true, missing: "fail", available: true },
 			{ id: "mystery", enabled: true, missing: "skip", available: false },
 			{
@@ -51,18 +52,18 @@ describe("listFilters", () => {
 		]);
 	});
 	it("returns nothing without pipeline.yml", () => {
-		expect(listFilters(null, "ie")).toEqual([]);
+		expect(listFilters(null, "ie", bundledFilters)).toEqual([]);
 	});
 	it("throws ConfigError on malformed YAML", () => {
-		expect(() => listFilters("version: [unclosed", "ie")).toThrow(
-			ConfigError,
-		);
+		expect(() =>
+			listFilters("version: [unclosed", "ie", bundledFilters),
+		).toThrow(ConfigError);
 	});
 });
 
 describe("buildFilterStages", () => {
 	it("keeps the enabled, known stages in order", () => {
-		const stages = buildFilterStages(valid, "ie");
+		const stages = buildFilterStages(valid, "ie", bundledFilters);
 		expect(stages.map((stage) => stage.filter.id)).toEqual(["budget"]);
 		expect(stages[0].missing).toBe("fail");
 	});

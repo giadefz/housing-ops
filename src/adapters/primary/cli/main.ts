@@ -5,7 +5,7 @@ import { resolveRoot } from "../../secondary/workspace.js";
 import { runCli } from "./run.js";
 
 async function main(): Promise<void> {
-	await runCli(createDefaultApplication(resolveRoot()), process.argv);
+	await runCli(await createDefaultApplication(resolveRoot()), process.argv);
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {

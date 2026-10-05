@@ -9,6 +9,16 @@ import {
 	type FilterStageConfig,
 } from "../../../core/schemas/index.js";
 import type { FilterStage } from "../../../core/services/pipeline.service.js";
+import { loadLocalFilters } from "./local.js";
+
+/** The available filters: the bundled ones plus the approved local modules. */
+export async function collectFilters(
+	root: string,
+	extensionsText: string | null,
+): Promise<Map<string, FilterPort>> {
+	const local = await loadLocalFilters(root, extensionsText);
+	return new Map([...bundledFilters, ...local]);
+}
 
 /** True when the filter exists and is not scoped to another country. */
 export function isFilterAvailable(
@@ -25,12 +35,13 @@ export function isFilterAvailable(
 export function listFilters(
 	pipelineText: string | null,
 	country: string,
+	filters: Map<string, FilterPort>,
 ): FilterSummary[] {
 	return parseStages(pipelineText).map((stage) => ({
 		id: stage.id,
 		enabled: stage.enabled,
 		missing: stage.missing,
-		available: isFilterAvailable(bundledFilters.get(stage.id), country),
+		available: isFilterAvailable(filters.get(stage.id), country),
 	}));
 }
 
@@ -38,18 +49,20 @@ export function listFilters(
 export function buildFilterStages(
 	pipelineText: string | null,
 	country: string,
+	filters: Map<string, FilterPort>,
 ): FilterStage[] {
 	return parseStages(pipelineText)
 		.filter((stage) => stage.enabled)
-		.map((stage) => toFilterStage(stage, country))
+		.map((stage) => toFilterStage(stage, country, filters))
 		.filter((stage): stage is FilterStage => stage !== undefined);
 }
 
 function toFilterStage(
 	stage: FilterStageConfig,
 	country: string,
+	filters: Map<string, FilterPort>,
 ): FilterStage | undefined {
-	const filter = bundledFilters.get(stage.id);
+	const filter = filters.get(stage.id);
 	if (filter === undefined || !isFilterAvailable(filter, country))
 		return undefined;
 	return { filter, missing: stage.missing };
