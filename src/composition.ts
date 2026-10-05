@@ -1,3 +1,4 @@
+import { listFilters } from "./adapters/secondary/filters/registry.js";
 import {
 	buildProviders,
 	listProviderSummaries,
@@ -33,6 +34,10 @@ export function createApplication(
 	dependencies: ApplicationDependencies,
 ): ApplicationPort {
 	const { storeFactory, readWorkspace, clock, pack } = dependencies;
+	const workspace = readWorkspace(root);
+	const providersText = workspace.configTexts["providers.yml"];
+	const pipelineText = workspace.configTexts["pipeline.yml"];
+
 	const withStore = async <T>(
 		use: (store: OfferStorePort) => Promise<T>,
 	): Promise<T> => {
@@ -43,22 +48,22 @@ export function createApplication(
 			handle.close();
 		}
 	};
-	const providersText = () =>
-		readWorkspace(root).configTexts["providers.yml"];
+
 	return {
 		getVersion,
-		validateWorkspace: () => validateWorkspace(readWorkspace(root)),
+		validateWorkspace: () => validateWorkspace(workspace),
 		getOffer: (id) => withStore((store) => getOffer(store, id)),
-		listProviders: () => listProviderSummaries(providersText()),
+		listProviders: () => listProviderSummaries(providersText),
+		listFilters: () => listFilters(pipelineText),
 		testProvider: async (id) => {
-			const provider = buildProviders(providersText()).get(id);
+			const provider = buildProviders(providersText).get(id);
 			if (provider === undefined) throw new ProviderNotFoundError(id);
 			return runProviderTest({ provider, cap: PROVIDER_TEST_CAP });
 		},
 		scan: (providerId) =>
 			withStore((store) => {
 				const providers = selectProviders(
-					buildProviders(providersText()),
+					buildProviders(providersText),
 					providerId,
 				);
 				if (providerId !== undefined && providers.length === 0) {

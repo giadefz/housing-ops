@@ -48,12 +48,21 @@ export interface ScanResult {
 	deadLettered: number;
 }
 
+/** One configured filter, as listed from pipeline.yml. */
+export interface FilterSummary {
+	id: string;
+	enabled: boolean;
+	missing: "skip" | "fail";
+	available: boolean;
+}
+
 /** The use-case surface every inbound (primary) adapter drives. Inbound adapters depend on this alone. */
 export interface ApplicationPort {
 	getVersion(): VersionInfo;
 	validateWorkspace(): ValidationReport;
 	getOffer(id: string): Promise<OfferDetail>;
 	listProviders(): ProviderSummary[];
+	listFilters(): FilterSummary[];
 	testProvider(id: string): Promise<ProviderTestResult>;
 	scan(providerId?: string): Promise<ScanResult>;
 }

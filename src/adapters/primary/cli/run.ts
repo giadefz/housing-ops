@@ -3,6 +3,7 @@ import { parseArgs, type ParsedArgs } from "./argv.js";
 import { fail, type Envelope } from "./envelope.js";
 import { toFailure } from "./failures.js";
 import { help } from "./commands/help.js";
+import { filterCommands } from "./commands/filter.js";
 import { offerCommands } from "./commands/offer.js";
 import { providerCommands } from "./commands/provider.js";
 import { scanCommands } from "./commands/scan.js";
@@ -13,6 +14,7 @@ const commandHandlers: Record<string, CommandHandler> = {
 	...systemCommands,
 	...offerCommands,
 	...providerCommands,
+	...filterCommands,
 	...scanCommands,
 };
 
