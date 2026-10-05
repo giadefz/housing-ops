@@ -4,7 +4,7 @@ import { bedroomsFilter } from "../src/core/filters/bedrooms.js";
 import { locationFilter } from "../src/core/filters/location.js";
 import type { Dwelling } from "../src/core/domain/dwelling.js";
 import type { Offer } from "../src/core/domain/offer.js";
-import type { Profile } from "../src/core/domain/profile.js";
+import type { Profile } from "../src/core/schemas/profile.js";
 import type { FilterInput } from "../src/core/ports/filter.port.js";
 import { runFilters } from "../src/core/services/pipeline.service.js";
 
@@ -56,7 +56,7 @@ function input(overrides: Partial<FilterInput> = {}): FilterInput {
 	return {
 		offer: offer(),
 		dwelling: dwelling(),
-		prefs: profile(),
+		profile: profile(),
 		comparables: [],
 		...overrides,
 	};
@@ -118,7 +118,7 @@ describe("built-in filters", () => {
 		expect(
 			budgetFilter.evaluate(
 				input({
-					prefs: profile({
+					profile: profile({
 						budget: { max: 2200, min: 2100, currency: "EUR" },
 					}),
 				}),
@@ -128,7 +128,7 @@ describe("built-in filters", () => {
 	it("bedrooms: passes within range, skips when unknown", () => {
 		expect(
 			bedroomsFilter.evaluate(
-				input({ prefs: profile({ bedrooms: { min: 1, max: 3 } }) }),
+				input({ profile: profile({ bedrooms: { min: 1, max: 3 } }) }),
 			).outcome,
 		).toBe("pass");
 		expect(
@@ -141,7 +141,7 @@ describe("built-in filters", () => {
 		expect(locationFilter.evaluate(input()).outcome).toBe("pass");
 		expect(
 			locationFilter.evaluate(
-				input({ prefs: profile({ areas: ["Cork"] }) }),
+				input({ profile: profile({ areas: ["Cork"] }) }),
 			).outcome,
 		).toBe("fail");
 	});

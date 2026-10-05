@@ -6,7 +6,8 @@ import {
 	type NewDwelling,
 } from "../domain/dwelling.js";
 import { normalizeListing, type NewOffer } from "../domain/listing.js";
-import type { Offer, OfferVersion } from "../domain/offer.js";
+import type { Offer, OfferStatus, OfferVersion } from "../domain/offer.js";
+import type { Verdict } from "../domain/verdict.js";
 import { errorMessage } from "../errors/message.js";
 import type { ScanResult } from "../ports/application.port.js";
 import type { ClockPort } from "../ports/clock.port.js";
@@ -16,12 +17,16 @@ import type {
 	OfferStorePort,
 	RunStats,
 } from "../ports/store.port.js";
+import type { Profile } from "../schemas/profile.js";
+import { runFilters, type FilterStage } from "./pipeline.service.js";
 
 export interface ScanDependencies {
 	providers: ProviderPort[];
 	store: OfferStorePort;
 	pack: CountryPack;
 	clock: ClockPort;
+	profile: Profile;
+	filters: FilterStage[];
 	paceMs?: number;
 	log?: (message: string) => void;
 }
@@ -30,6 +35,8 @@ interface ScanWiring {
 	store: OfferStorePort;
 	pack: CountryPack;
 	clock: ClockPort;
+	profile: Profile;
+	filters: FilterStage[];
 	fetch: FetchContext;
 }
 
@@ -38,13 +45,15 @@ const FETCH_TIMEOUT_MS = 60_000;
 
 type Outcome = "stored" | "deadLettered";
 
-/** Fetches from each provider, normalizes, and stores. Every record is kept: bad ones go to dead-letter. */
+/** Fetches from each provider, normalizes, filters, and stores. Bad records go to dead-letter. */
 export function scan(dependencies: ScanDependencies): Promise<ScanResult> {
-	const { providers, store, pack, clock } = dependencies;
+	const { providers, store, pack, clock, profile, filters } = dependencies;
 	const wiring: ScanWiring = {
 		store,
 		pack,
 		clock,
+		profile,
+		filters,
 		fetch: createFetchContext(dependencies),
 	};
 	return providers.reduce(
@@ -96,7 +105,6 @@ async function storeRecord(job: RecordJob): Promise<Outcome> {
 			fetchedAt,
 		});
 		const dwelling = await resolveDwelling(normalized.dwelling, wiring);
-		await store.saveDwelling(dwelling);
 		const offer = await resolveOffer({
 			provider,
 			newOffer: normalized.offer,
@@ -104,7 +112,10 @@ async function storeRecord(job: RecordJob): Promise<Outcome> {
 			payload: record,
 			wiring,
 		});
-		await store.saveOffer(offer);
+		const judged = judge(offer, dwelling, wiring);
+		await store.saveDwelling(dwelling);
+		await store.saveOffer(judged.offer);
+		await recordVerdicts(store, offer.id, runId, judged.verdicts);
 		return "stored";
 	} catch (error) {
 		await store.recordDeadLetter(
@@ -112,6 +123,38 @@ async function storeRecord(job: RecordJob): Promise<Outcome> {
 		);
 		return "deadLettered";
 	}
+}
+
+interface Judged {
+	offer: Offer;
+	verdicts: Verdict[];
+}
+
+/** Runs the pipeline on a first sighting; a filtered-out offer stays "seen". */
+function judge(offer: Offer, dwelling: Dwelling, wiring: ScanWiring): Judged {
+	if (offer.status !== "seen") return { offer, verdicts: [] };
+	const run = runFilters(wiring.filters, {
+		offer,
+		dwelling,
+		profile: wiring.profile,
+		comparables: [],
+	});
+	const status: OfferStatus = run.passed
+		? wiring.profile.gate
+			? "pending"
+			: "passed"
+		: offer.status;
+	return { offer: { ...offer, status }, verdicts: run.verdicts };
+}
+
+async function recordVerdicts(
+	store: OfferStorePort,
+	offerId: string,
+	runId: string,
+	verdicts: Verdict[],
+): Promise<void> {
+	for (const verdict of verdicts)
+		await store.recordVerdict(offerId, runId, verdict);
 }
 
 async function resolveDwelling(

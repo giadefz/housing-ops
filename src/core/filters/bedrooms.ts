@@ -3,11 +3,11 @@ import type { FilterPort } from "../ports/filter.port.js";
 /** Passes when the bedroom count is within the profile range. Skips when unknown. */
 export const bedroomsFilter: FilterPort = {
 	id: "bedrooms",
-	evaluate({ dwelling, prefs }) {
+	evaluate({ dwelling, profile }) {
 		const bedrooms = dwelling.rooms?.bedrooms;
 		if (bedrooms === undefined)
 			return { outcome: "skip", reason: "bedrooms unknown" };
-		const { min, max } = prefs.bedrooms ?? {};
+		const { min, max } = profile.bedrooms ?? {};
 		if (min !== undefined && bedrooms < min) {
 			return {
 				outcome: "fail",

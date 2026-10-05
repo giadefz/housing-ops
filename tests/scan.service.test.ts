@@ -11,11 +11,14 @@ import {
 import { findOfferByListing } from "../src/adapters/secondary/storage/sqlite/offer.js";
 import { irelandPack } from "../src/countries/ie/pack.js";
 import type { Listing } from "../src/core/domain/listing.js";
+import { budgetFilter } from "../src/core/filters/budget.js";
 import type { ClockPort } from "../src/core/ports/clock.port.js";
 import type {
 	FetchContext,
 	ProviderPort,
 } from "../src/core/ports/provider.port.js";
+import type { Profile } from "../src/core/schemas/profile.js";
+import type { FilterStage } from "../src/core/services/pipeline.service.js";
 import { scan } from "../src/core/services/scan.service.js";
 
 let cleanups: Array<() => void> = [];
@@ -35,6 +38,19 @@ function testDatabase(): Database.Database {
 }
 
 const clock: ClockPort = { now: () => "2026-10-04T00:00:00.000Z" };
+const budgetStage: FilterStage = { filter: budgetFilter, missing: "fail" };
+
+function profile(overrides: Partial<Profile> = {}): Profile {
+	return {
+		market: "rent",
+		country: "ie",
+		budget: { max: 2200, currency: "EUR" },
+		areas: ["Dublin 8"],
+		gate: false,
+		recheckHours: 48,
+		...overrides,
+	};
+}
 
 function listing(id: string, overrides: Partial<Listing> = {}): Listing {
 	return {
@@ -59,21 +75,61 @@ function providerOf(records: unknown[]): ProviderPort {
 	};
 }
 
+function verdicts(database: Database.Database): unknown[] {
+	return database.prepare("SELECT filter_id, outcome FROM verdicts").all();
+}
+
 describe("scan", () => {
-	it("normalizes and stores valid listings", async () => {
+	it("normalizes, filters, and stores a passing listing as passed", async () => {
 		const database = testDatabase();
 		const store = createSqliteStore(database);
 		const result = await scan({
-			providers: [providerOf([listing("a"), listing("b")])],
+			providers: [providerOf([listing("a")])],
 			store,
 			pack: irelandPack,
 			clock,
+			profile: profile(),
+			filters: [budgetStage],
 		});
-		expect(result).toEqual({ fetched: 2, stored: 2, deadLettered: 0 });
+		expect(result).toEqual({ fetched: 1, stored: 1, deadLettered: 0 });
+		const offer = await findOfferByListing(database, "fake", "a");
+		expect(offer?.status).toBe("passed");
+		expect(verdicts(database)).toEqual([
+			{ filter_id: "budget", outcome: "pass" },
+		]);
+	});
+
+	it("parks a passing offer as pending when the gate is on", async () => {
+		const database = testDatabase();
+		const store = createSqliteStore(database);
+		await scan({
+			providers: [providerOf([listing("a")])],
+			store,
+			pack: irelandPack,
+			clock,
+			profile: profile({ gate: true }),
+			filters: [budgetStage],
+		});
+		const offer = await findOfferByListing(database, "fake", "a");
+		expect(offer?.status).toBe("pending");
+	});
+
+	it("leaves a filtered-out offer seen and records the failing verdict", async () => {
+		const database = testDatabase();
+		const store = createSqliteStore(database);
+		await scan({
+			providers: [providerOf([listing("a")])],
+			store,
+			pack: irelandPack,
+			clock,
+			profile: profile({ budget: { max: 1000, currency: "EUR" } }),
+			filters: [budgetStage],
+		});
 		const offer = await findOfferByListing(database, "fake", "a");
 		expect(offer?.status).toBe("seen");
-		expect(offer?.price.amount).toBe(2000);
-		expect(offer?.versions).toHaveLength(1);
+		expect(verdicts(database)).toEqual([
+			{ filter_id: "budget", outcome: "fail" },
+		]);
 	});
 
 	it("dead-letters a malformed listing", async () => {
@@ -84,6 +140,8 @@ describe("scan", () => {
 			store,
 			pack: irelandPack,
 			clock,
+			profile: profile(),
+			filters: [budgetStage],
 		});
 		expect(result).toEqual({ fetched: 2, stored: 1, deadLettered: 1 });
 		const dead: unknown[] = database
@@ -95,9 +153,16 @@ describe("scan", () => {
 	it("keeps one version when re-scanning an unchanged listing", async () => {
 		const database = testDatabase();
 		const store = createSqliteStore(database);
-		const providers = [providerOf([listing("a")])];
-		await scan({ providers, store, pack: irelandPack, clock });
-		await scan({ providers, store, pack: irelandPack, clock });
+		const dependencies = {
+			providers: [providerOf([listing("a")])],
+			store,
+			pack: irelandPack,
+			clock,
+			profile: profile(),
+			filters: [budgetStage],
+		};
+		await scan(dependencies);
+		await scan(dependencies);
 		const offer = await findOfferByListing(database, "fake", "a");
 		expect(offer?.versions).toHaveLength(1);
 		const offers: unknown[] = database
@@ -109,20 +174,27 @@ describe("scan", () => {
 	it("adds a version when a re-scan finds a change", async () => {
 		const database = testDatabase();
 		const store = createSqliteStore(database);
-		await scan({
-			providers: [providerOf([listing("a")])],
+		const base = {
 			store,
 			pack: irelandPack,
 			clock,
-		});
-		const cheaper = listing("a", {
-			price: { amount: 1800, currency: "EUR", period: "month" },
-		});
+			profile: profile(),
+			filters: [budgetStage],
+		};
+		await scan({ ...base, providers: [providerOf([listing("a")])] });
 		await scan({
-			providers: [providerOf([cheaper])],
-			store,
-			pack: irelandPack,
-			clock,
+			...base,
+			providers: [
+				providerOf([
+					listing("a", {
+						price: {
+							amount: 1800,
+							currency: "EUR",
+							period: "month",
+						},
+					}),
+				]),
+			],
 		});
 		const offer = await findOfferByListing(database, "fake", "a");
 		expect(offer?.versions).toHaveLength(2);

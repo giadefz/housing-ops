@@ -49,7 +49,8 @@ describe("validate on empty workspace", () => {
 	});
 	it("passes a present valid config file", () => {
 		const input = emptyInput();
-		input.configTexts["profile.yml"] = "version: 1\n";
+		input.configTexts["profile.yml"] =
+			"version: 1\nmarket: rent\ncountry: ie\nbudget:\n  max: 2200\n  currency: EUR\n";
 		const report = validateWorkspace(input);
 		const finding = report.findings.find(
 			(candidate) => candidate.name === "config.profile.yml",

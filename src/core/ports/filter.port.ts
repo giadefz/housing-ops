@@ -1,12 +1,12 @@
 import type { Dwelling } from "../domain/dwelling.js";
 import type { Offer } from "../domain/offer.js";
-import type { Profile } from "../domain/profile.js";
+import type { Profile } from "../schemas/profile.js";
 
 /** Everything a filter may read: the sighting, the place, the profile, and comparables. */
 export interface FilterInput {
 	offer: Offer;
 	dwelling: Dwelling;
-	prefs: Profile;
+	profile: Profile;
 	comparables: Offer[];
 }
 
