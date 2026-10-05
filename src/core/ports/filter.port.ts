@@ -16,10 +16,16 @@ export type FilterDecision =
 	| { outcome: "fail"; reason: string }
 	| { outcome: "skip"; reason: string };
 
+/** A profile field a filter can consume. */
+export type ProfileKey =
+	"budget" | "areas" | "layouts" | "bedrooms" | "minSizeM2";
+
 /** A pure judgment over one offer. Implemented by bundled and authored filters. */
 export interface FilterPort {
 	id: string;
 	/** The country this filter is scoped to; unset means generic. */
 	country?: string;
+	/** The profile fields this filter reads; unset means none. */
+	reads?: ProfileKey[];
 	evaluate(input: FilterInput): FilterDecision;
 }

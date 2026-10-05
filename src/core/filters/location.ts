@@ -4,6 +4,7 @@ import type { FilterPort } from "../ports/filter.port.js";
 /** Passes when the address names one of the profile areas. Skips when the address is empty. */
 export const locationFilter: FilterPort = {
 	id: "location",
+	reads: ["areas"],
 	evaluate({ dwelling, profile }) {
 		if (profile.areas.length === 0) return { outcome: "pass" };
 		const address = normalizeText(dwelling.address.freeText);

@@ -14,5 +14,7 @@ export function createDefaultApplication(
 		readWorkspace,
 		clock: systemClock,
 		pack: irelandPack,
+		warn: (message) =>
+			process.stderr.write(`housing-ops: warning: ${message}\n`),
 	});
 }

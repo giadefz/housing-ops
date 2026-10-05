@@ -3,6 +3,7 @@ import {
 	collectFilters,
 	listFilters,
 } from "./adapters/secondary/filters/registry.js";
+import { profileCoverageWarnings } from "./adapters/secondary/filters/coverage.js";
 import { parseProfile } from "./adapters/secondary/profile.js";
 import {
 	buildProviders,
@@ -43,6 +44,7 @@ export interface ApplicationDependencies {
 	readWorkspace: (root: string) => WorkspaceInput;
 	clock: ClockPort;
 	pack: CountryPack;
+	warn: (message: string) => void;
 }
 
 /** Wires the given adapters into the application surface inbound adapters drive. */
@@ -50,7 +52,7 @@ export async function createApplication(
 	root: string,
 	dependencies: ApplicationDependencies,
 ): Promise<ApplicationPort> {
-	const { storeFactory, readWorkspace, clock, pack } = dependencies;
+	const { storeFactory, readWorkspace, clock, pack, warn } = dependencies;
 	const workspace = readWorkspace(root);
 	const providersText = workspace.configTexts["providers.yml"];
 	const pipelineText = workspace.configTexts["pipeline.yml"];
@@ -59,6 +61,13 @@ export async function createApplication(
 		root,
 		workspace.configTexts["extensions.yml"],
 	);
+	warnOnProfileGaps({
+		profileText,
+		pipelineText,
+		country: pack.code,
+		filters,
+		warn,
+	});
 	return {
 		getVersion,
 		validateWorkspace: () => validateWorkspace(workspace),
@@ -89,6 +98,28 @@ export async function createApplication(
 				),
 			),
 	};
+}
+
+interface ProfileGapInput {
+	profileText: string | null;
+	pipelineText: string | null;
+	country: string;
+	filters: Map<string, FilterPort>;
+	warn: (message: string) => void;
+}
+
+/** Reports profile fields and enabled filters that do not line up, at boot. */
+function warnOnProfileGaps(input: ProfileGapInput): void {
+	const stages = buildFilterStages(
+		input.pipelineText,
+		input.country,
+		input.filters,
+	);
+	const warnings = profileCoverageWarnings(
+		stages,
+		parseProfile(input.profileText),
+	);
+	for (const warning of warnings) input.warn(warning);
 }
 
 async function withStore<T>(

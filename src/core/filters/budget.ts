@@ -3,6 +3,7 @@ import type { FilterPort } from "../ports/filter.port.js";
 /** Passes when the price is within the profile budget. */
 export const budgetFilter: FilterPort = {
 	id: "budget",
+	reads: ["budget"],
 	evaluate({ offer, profile }) {
 		const { amount } = offer.price;
 		const { min, max } = profile.budget;

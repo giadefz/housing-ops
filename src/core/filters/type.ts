@@ -3,6 +3,7 @@ import type { FilterPort } from "../ports/filter.port.js";
 /** Passes when the layout is one of the profile's layouts. Unset means no constraint. */
 export const typeFilter: FilterPort = {
 	id: "type",
+	reads: ["layouts"],
 	evaluate({ dwelling, profile }) {
 		const layouts = profile.layouts;
 		if (layouts === undefined || layouts.length === 0)

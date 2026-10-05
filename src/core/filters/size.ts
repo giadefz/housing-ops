@@ -4,6 +4,7 @@ import type { FilterPort } from "../ports/filter.port.js";
 /** Passes when the size is at least the profile minimum. Skips when the size is unknown. */
 export const sizeFilter: FilterPort = {
 	id: "size",
+	reads: ["minSizeM2"],
 	evaluate({ dwelling, profile }) {
 		const minSizeM2 = profile.minSizeM2;
 		if (minSizeM2 === undefined) return { outcome: "pass" };
