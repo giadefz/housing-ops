@@ -19,5 +19,7 @@ export type FilterDecision =
 /** A pure judgment over one offer. Implemented by bundled and authored filters. */
 export interface FilterPort {
 	id: string;
+	/** The country this filter is scoped to; unset means generic. */
+	country?: string;
 	evaluate(input: FilterInput): FilterDecision;
 }

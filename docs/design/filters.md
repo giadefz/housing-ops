@@ -12,6 +12,10 @@ pass; fail with a reason; or skip with a reason (insufficient data). Parameters
 come from the profile (`profile.yml`) — there is no per-filter config, so
 preferences live in one place.
 
+A filter may declare a `country`; it is excluded from the pipeline (and shown
+`available: false`) when the active country differs. Generic filters leave it
+unset.
+
 The runner records a **verdict** per filter (`{ filterId, outcome, reason }`)
 and passes the offer when no filter fails. A stage's `missing` policy turns a
 skip into a fail when set to `fail`.

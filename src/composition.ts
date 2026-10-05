@@ -54,7 +54,7 @@ export function createApplication(
 		validateWorkspace: () => validateWorkspace(workspace),
 		getOffer: (id) => withStore((store) => getOffer(store, id)),
 		listProviders: () => listProviderSummaries(providersText),
-		listFilters: () => listFilters(pipelineText),
+		listFilters: () => listFilters(pipelineText, pack.code),
 		testProvider: async (id) => {
 			const provider = buildProviders(providersText).get(id);
 			if (provider === undefined) throw new ProviderNotFoundError(id);
