@@ -6,16 +6,20 @@ memory beyond what the context hands it. The pipeline runs them in
 
 ## The contract (v0 — provisional)
 
-A filter has an id, a config schema that validates its own config, and an
-`evaluate` step. `evaluate` receives the offer, the dwelling, the profile, and
-comparables from history, and returns a **verdict**: pass; fail with a reason;
-or skip with a reason (insufficient data).
+A filter has an id and a pure `evaluate`. `evaluate` receives the offer, the
+dwelling, the profile, and comparables from history, and returns a **decision**:
+pass; fail with a reason; or skip with a reason (insufficient data). Parameters
+come from the profile (`profile.yml`) — there is no per-filter config, so
+preferences live in one place.
+
+The runner records a **verdict** per filter (`{ filterId, outcome, reason }`)
+and passes the offer when no filter fails. A stage's `missing` policy turns a
+skip into a fail when set to `fail`.
 
 Provisional means the shape is the working hypothesis, finalized against real
-provider data in Phase 3. Prefer small filters with sharp reasons over clever
-ones — the agent reads these reasons during triage. History is read-only access
-to stored offers (for comparables, e.g. price-outlier checks), never to other
-filters' internals.
+provider data. Prefer small filters with sharp reasons — the agent reads these
+reasons during triage. Comparables are read-only stored offers (for price-outlier
+checks), never other filters' internals.
 
 ## Pipeline file
 
@@ -25,12 +29,11 @@ filters:
   - id: location
     enabled: true
     missing: skip            # skip | fail — what a skip becomes here
-    config: { areas: ["Dublin 8", "Dublin 6"], radius_km: null }
   - id: budget
     enabled: true
     missing: fail
-    config: { max: 2200, currency: EUR, include_utilities_estimate: true }
 ```
+
 
 `missing: skip` is the default (fail-open); hard constraints flip to `fail`.
 Disabling a filter is a config edit, never a code change.

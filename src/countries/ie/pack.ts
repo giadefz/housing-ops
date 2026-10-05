@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { normalizeText } from "../../core/text.js";
 import type { Address, LayoutType } from "../../core/domain/dwelling.js";
 import type { CountryPack } from "../../core/domain/country-pack.js";
 
@@ -28,11 +29,7 @@ function normalizeIrishAddress(
 	address: Address,
 	attributes: Record<string, unknown>,
 ): string {
-	const street = address.freeText
-		.toLowerCase()
-		.replace(/[^a-z0-9 ]/g, " ")
-		.replace(/\s+/g, " ")
-		.trim();
+	const street = normalizeText(address.freeText.replace(/[^a-z0-9 ]/gi, " "));
 	const eircode = attributes["eircode"];
 	const code =
 		typeof eircode === "string"
