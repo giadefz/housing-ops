@@ -30,7 +30,7 @@ against a mismatched api version and tells the user to update.
 | `prefs get [path]` | optional path | profile subtree |
 | `prefs set <path> <json-value>` | path + value | `{ path, value }` — validated write, fails loudly on bad input |
 | `filter list` | — | `{ filters: [{ id, enabled, missing, available }] }` |
-| `filter check <id>` | id | `{ schema_ok, dry_run: { evaluated, pass, fail, skipped, examples: [...] } }` |
+| `filter check <id>` | id | `{ evaluated, pass, fail, skip, examples: [{ offerId, outcome, reason }] }` |
 | `provider list` | — | `{ providers: [{ id, type, country, markets, enabled }] }` |
 | `provider test <id>` | id | `{ fetched, sample: [Listing] }` — capped sample, validates interchange |
 | `publish now [--event offer.passed]` | flags | `{ published: [{ publisher, event, offer_id, ok }] }` |

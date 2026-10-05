@@ -9,15 +9,18 @@ import {
 	listProviderSummaries,
 } from "./adapters/secondary/providers/registry.js";
 import type { CountryPack } from "./core/domain/country-pack.js";
+import { FilterNotFoundError } from "./core/errors/filter.js";
 import { ProviderNotFoundError } from "./core/errors/provider.js";
 import type {
 	ApplicationPort,
+	FilterCheckResult,
 	ScanResult,
 } from "./core/ports/application.port.js";
 import type { ClockPort } from "./core/ports/clock.port.js";
 import type { FilterPort } from "./core/ports/filter.port.js";
 import type { ProviderPort } from "./core/ports/provider.port.js";
 import type { OfferStorePort, StoreFactory } from "./core/ports/store.port.js";
+import { checkFilter } from "./core/services/filter.service.js";
 import { getOffer } from "./core/services/offer.service.js";
 import {
 	testProvider as runProviderTest,
@@ -31,6 +34,8 @@ import {
 import { getVersion } from "./core/version.js";
 
 const PROVIDER_TEST_CAP = 5;
+const CHECK_SAMPLE_LIMIT = 50;
+const CHECK_EXAMPLE_LIMIT = 5;
 
 /** The concrete adapters the application is wired with. */
 export interface ApplicationDependencies {
@@ -61,6 +66,10 @@ export async function createApplication(
 			withStore(storeFactory, root, (store) => getOffer(store, id)),
 		listProviders: () => listProviderSummaries(providersText),
 		listFilters: () => listFilters(pipelineText, pack.code, filters),
+		checkFilter: (id) =>
+			withStore(storeFactory, root, (store) =>
+				checkFilterPort({ filters, profileText, id, store }),
+			),
 		testProvider: (id) => runProviderTest(providerTrial(providersText, id)),
 		scan: (providerId) =>
 			withStore(storeFactory, root, (store) =>
@@ -102,6 +111,27 @@ function providerTrial(
 	const provider = buildProviders(providersText).get(id);
 	if (provider === undefined) throw new ProviderNotFoundError(id);
 	return { provider, cap: PROVIDER_TEST_CAP };
+}
+
+interface FilterCheckRequest {
+	filters: Map<string, FilterPort>;
+	profileText: string | null;
+	id: string;
+	store: OfferStorePort;
+}
+
+async function checkFilterPort(
+	request: FilterCheckRequest,
+): Promise<FilterCheckResult> {
+	const { filters, profileText, id, store } = request;
+	const filter = filters.get(id);
+	if (filter === undefined) throw new FilterNotFoundError(id);
+	return checkFilter({
+		filter,
+		profile: parseProfile(profileText),
+		samples: await store.listStoredOffers(CHECK_SAMPLE_LIMIT),
+		exampleLimit: CHECK_EXAMPLE_LIMIT,
+	});
 }
 
 /** The values scan needs that do not depend on which provider is being scanned. */

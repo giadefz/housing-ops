@@ -2,6 +2,7 @@ import { AppError } from "../../../core/errors/app-error.js";
 import { ConfigError } from "../../../core/errors/config.js";
 import { InvalidDwellingError } from "../../../core/errors/dwelling.js";
 import { InvalidListingError } from "../../../core/errors/listing.js";
+import { FilterNotFoundError } from "../../../core/errors/filter.js";
 import { errorMessage } from "../../../core/errors/message.js";
 import {
 	InvalidTransitionError,
@@ -33,6 +34,10 @@ const failureSpecs = new Map<AppErrorClass, FailureSpec>([
 	[InvalidTransitionError, { code: "INVALID_TRANSITION" }],
 	[InvalidDwellingError, { code: "INVALID_DWELLING" }],
 	[InvalidListingError, { code: "INVALID_LISTING" }],
+	[
+		FilterNotFoundError,
+		{ code: "FILTER_NOT_FOUND", hint: "run housing-ops filter list" },
+	],
 	[
 		ProviderNotFoundError,
 		{

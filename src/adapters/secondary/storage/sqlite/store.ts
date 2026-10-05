@@ -1,12 +1,24 @@
 import Database from "better-sqlite3";
-import type { OfferStorePort } from "../../../../core/ports/store.port.js";
+import type {
+	OfferStorePort,
+	StoredOfferDetail,
+} from "../../../../core/ports/store.port.js";
 import { recordAnalysis } from "./analysis.js";
 import { recordDeadLetter } from "./dead-letter.js";
-import { findDwellingByAddressKey, saveDwelling } from "./dwelling.js";
+import {
+	findDwellingByAddressKey,
+	findDwellingById,
+	saveDwelling,
+} from "./dwelling.js";
 import { recordInteraction } from "./interaction.js";
 import { markMarketOutcome } from "./market-event.js";
 import { migrate } from "./migrate.js";
-import { findOffer, findOfferByListing, saveOffer } from "./offer.js";
+import {
+	findOffer,
+	findOfferByListing,
+	listOfferIds,
+	saveOffer,
+} from "./offer.js";
 import { listQueue } from "./queue.js";
 import { finishRun, startRun } from "./run.js";
 import { listVerdicts, recordVerdict } from "./verdict.js";
@@ -40,6 +52,7 @@ export function createSqliteStore(database: Database.Database): OfferStorePort {
 		recordInteraction: (interaction) =>
 			recordInteraction(database, interaction),
 		listQueue: async (status, limit) => listQueue(database, status, limit),
+		listStoredOffers: async (limit) => listStoredOffers(database, limit),
 		startRun: (provider) => startRun(database, provider),
 		finishRun: (runId, stats) => finishRun(database, runId, stats),
 		recordDeadLetter: async (entry) => {
@@ -48,4 +61,21 @@ export function createSqliteStore(database: Database.Database): OfferStorePort {
 		markMarketOutcome: (offerId, outcome, observedAt) =>
 			markMarketOutcome(database, offerId, outcome, observedAt),
 	};
+}
+
+async function listStoredOffers(
+	database: Database.Database,
+	limit: number,
+): Promise<StoredOfferDetail[]> {
+	const details: StoredOfferDetail[] = [];
+	for (const id of listOfferIds(database, limit)) {
+		const offer = await findOffer(database, id);
+		const dwelling =
+			offer === null
+				? null
+				: await findDwellingById(database, offer.dwellingId);
+		if (offer !== null && dwelling !== null)
+			details.push({ offer, dwelling });
+	}
+	return details;
 }

@@ -56,6 +56,22 @@ export interface FilterSummary {
 	available: boolean;
 }
 
+/** One non-passing example from a filter dry-run. */
+export interface FilterCheckExample {
+	offerId: string;
+	outcome: "pass" | "fail" | "skip";
+	reason: string;
+}
+
+/** The distribution of a filter over stored offers. */
+export interface FilterCheckResult {
+	evaluated: number;
+	pass: number;
+	fail: number;
+	skip: number;
+	examples: FilterCheckExample[];
+}
+
 /** The use-case surface every inbound (primary) adapter drives. Inbound adapters depend on this alone. */
 export interface ApplicationPort {
 	getVersion(): VersionInfo;
@@ -63,6 +79,7 @@ export interface ApplicationPort {
 	getOffer(id: string): Promise<OfferDetail>;
 	listProviders(): ProviderSummary[];
 	listFilters(): FilterSummary[];
+	checkFilter(id: string): Promise<FilterCheckResult>;
 	testProvider(id: string): Promise<ProviderTestResult>;
 	scan(providerId?: string): Promise<ScanResult>;
 }

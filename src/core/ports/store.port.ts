@@ -35,6 +35,12 @@ export interface DeadLetterEntry {
 	receivedAt: string;
 }
 
+/** A stored offer together with its dwelling, for pipeline dry-runs. */
+export interface StoredOfferDetail {
+	offer: Offer;
+	dwelling: Dwelling;
+}
+
 /** Persists and queries offers. Implemented by storage adapters. */
 export interface OfferStorePort {
 	saveDwelling(dwelling: Dwelling): Promise<void>;
@@ -54,6 +60,7 @@ export interface OfferStorePort {
 	recordAnalysis(analysis: Analysis): Promise<void>;
 	recordInteraction(interaction: Interaction): Promise<void>;
 	listQueue(status: OfferStatus, limit: number): Promise<OfferSummary[]>;
+	listStoredOffers(limit: number): Promise<StoredOfferDetail[]>;
 	startRun(provider: string): Promise<string>;
 	finishRun(runId: string, stats: RunStats): Promise<void>;
 	recordDeadLetter(entry: DeadLetterEntry): Promise<void>;

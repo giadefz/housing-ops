@@ -191,3 +191,14 @@ function hasId(record: unknown): record is { id: string } {
 		typeof record.id === "string"
 	);
 }
+
+/** Lists recent offer ids, newest first. */
+export function listOfferIds(
+	database: Database.Database,
+	limit: number,
+): string[] {
+	const records: unknown[] = database
+		.prepare("SELECT id FROM offers ORDER BY fetched_at DESC LIMIT ?")
+		.all(limit);
+	return records.flatMap((record) => (hasId(record) ? [record.id] : []));
+}

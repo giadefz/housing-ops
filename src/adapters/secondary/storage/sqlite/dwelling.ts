@@ -149,3 +149,15 @@ export async function findDwellingByAddressKey(
 	if (record === undefined) return null;
 	return toDomain(record);
 }
+
+/** Finds a dwelling by id. Null when unknown. */
+export async function findDwellingById(
+	database: Database.Database,
+	id: string,
+): Promise<Dwelling | null> {
+	const record: unknown = database
+		.prepare("SELECT * FROM dwellings WHERE id = ?")
+		.get(id);
+	if (record === undefined) return null;
+	return toDomain(record);
+}
