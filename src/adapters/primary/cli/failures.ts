@@ -13,6 +13,7 @@ import {
 	ProviderError,
 	ProviderNotFoundError,
 } from "../../../core/errors/provider.js";
+import { PublisherError } from "../../../core/errors/publisher.js";
 import {
 	InvalidProfileValueError,
 	ProfilePathError,
@@ -58,6 +59,13 @@ const failureSpecs = new Map<AppErrorClass, FailureSpec>([
 		{
 			code: "PROVIDER_ERROR",
 			hint: "the command must print the listing interchange on stdout",
+		},
+	],
+	[
+		PublisherError,
+		{
+			code: "PUBLISHER_ERROR",
+			hint: "the command must read the event envelope on stdin and exit 0",
 		},
 	],
 	[ConfigError, { code: "CONFIG_ERROR", hint: "run housing-ops validate" }],

@@ -1,10 +1,21 @@
 import yaml from "js-yaml";
 import { ConfigError } from "../../../core/errors/config.js";
 import { errorMessage } from "../../../core/errors/message.js";
+import type { PublisherPort } from "../../../core/ports/publisher.port.js";
 import {
 	PublishersFileSchema,
 	type PublisherEntry,
 } from "../../../core/schemas/index.js";
+import { createProcessPublisher } from "./process-publisher.js";
+
+/** Builds the enabled publishers from the publishers.yml text. An invalid file throws. */
+export function buildPublishers(
+	publishersText: string | null,
+): PublisherPort[] {
+	return parsePublishers(publishersText)
+		.filter((entry) => entry.enabled)
+		.map((entry) => createProcessPublisher(entry));
+}
 
 /** Parses publishers.yml into its entries. An invalid file throws. */
 export function parsePublishers(
