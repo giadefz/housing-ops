@@ -10,6 +10,7 @@ function emptyInput(): WorkspaceInput {
 			"profile.yml": null,
 			"pipeline.yml": null,
 			"providers.yml": null,
+			"publishers.yml": null,
 			"extensions.yml": null,
 		},
 		currentHashes: {},
@@ -39,6 +40,7 @@ describe("validate on empty workspace", () => {
 			"profile.yml",
 			"pipeline.yml",
 			"providers.yml",
+			"publishers.yml",
 			"extensions.yml",
 		]) {
 			expect(byName[`config.${file}`].ok).toBe(false);
@@ -76,6 +78,23 @@ describe("validate on empty workspace", () => {
 		);
 		expect(finding?.ok).toBe(false);
 		expect(finding?.detail).toMatch(/invalid/);
+	});
+	it("passes a valid publishers.yml", () => {
+		const input = emptyInput();
+		input.configTexts["publishers.yml"] = "version: 1\npublishers: []\n";
+		const finding = validateWorkspace(input).findings.find(
+			(candidate) => candidate.name === "config.publishers.yml",
+		);
+		expect(finding?.ok).toBe(true);
+	});
+	it("fails a malformed publisher entry", () => {
+		const input = emptyInput();
+		input.configTexts["publishers.yml"] =
+			"version: 1\npublishers:\n  - id: hook\n    type: webhook\n";
+		const finding = validateWorkspace(input).findings.find(
+			(candidate) => candidate.name === "config.publishers.yml",
+		);
+		expect(finding?.ok).toBe(false);
 	});
 });
 

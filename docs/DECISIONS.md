@@ -50,10 +50,17 @@ Open risks to grill: scraping ToS per country; deduping the same listing across 
 - [x] Phase 3 — filters: contract + ordered runner, `pipeline.yml`, `filter list`/`check`, country gating, local discovery (approved `filters.local`), built-ins budget/bedrooms/location/type/size (102 tests; type/size uncommitted)
 - [x] Phase 4 — dedup + version history (recheck/delisting cut per D46–D48; 107 tests) — **Phase 4 complete**
 - [x] Phase 5 — queue + profile (`queue`, `verdict set`, `interact`, `profile get/set/digest`; D49–D54; 131 tests) — **Phase 5 complete**
-- [ ] Next: Phase 6 — publishers + gate
+- [ ] Next: implement Phase 6 — publishers + gate. Plan: `docs/plans/phase-6.md` (D57–D60 settled)
 - [ ] Round 3+: scheduling, security of user-authored code, testing/CI, license
 
 ## Decisions
+
+### Phase 6 scope (2026-10-07)
+
+- **D57 — Publishers are generic and subscription-driven.** One `PublisherPort` (`id`, `publish(event, payload)`); a publisher declares a `type` (the transport) and an `events` subscription in its own config. v1 ships **only the `process` transport**: the core writes the event payload as JSON to an external command's stdin; exit 0 = delivered, non-zero = failure (logged, never blocking the run). Telegram, an external API, a Playwright script, or `curl` are all process publishers — anything that reads stdin. There is no separate "trigger type": the trigger is the subscription. The webhook is documented as an example script, not a bundled adapter (mirrors D41). Amends D19 (the bundled v1 webhook).
+- **D58 — Pipeline events are the milestones.** `offer.passed` (filters cleared → marketStatus `passed` or `pending`; the fast, pre-agent signal), `offer.screened` (triage screened), `offer.shortlisted` (analysis shortlist), `offer.closed` (`let`/`sold`/`gone`), `offer.updated` (a scan appended a version). `offer.judged` is dropped. Amends the event list in `events.ts` / `publishers.md`.
+- **D59 — `publishers.yml` is a fifth config file** (version 1, `publishers: [...]`), separate from `providers.yml`. `CONFIG_FILES`, `validate`, and `setup` grow by one. Amends D28 (four config files).
+- **D60 — Publishing is best-effort; `publish now` re-delivers.** A failed delivery is logged and never blocks a run; the payload is the full `offer get` shape plus event metadata, so a consumer never needs a second call. `publish now [--event] [--limit]` re-delivers an event over eligible stored offers.
 
 ### Status model (2026-10-07)
 

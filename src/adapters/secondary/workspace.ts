@@ -51,6 +51,7 @@ function readConfigs(root: string): Record<ConfigFile, string | null> {
 		"profile.yml": readText(configPath(root, "profile.yml")),
 		"pipeline.yml": readText(configPath(root, "pipeline.yml")),
 		"providers.yml": readText(configPath(root, "providers.yml")),
+		"publishers.yml": readText(configPath(root, "publishers.yml")),
 		"extensions.yml": readText(configPath(root, "extensions.yml")),
 	};
 }

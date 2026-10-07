@@ -87,6 +87,7 @@ function workspace(): Workspace {
 	writeConfig(root, "profile.yml", profileYaml);
 	writeConfig(root, "pipeline.yml", pipelineYaml);
 	writeConfig(root, "providers.yml", providersYaml);
+	writeConfig(root, "publishers.yml", "version: 1\n");
 	writeConfig(root, "extensions.yml", "version: 1\n");
 	return { root, database: openStore(path.join(root, "data", "housing.db")) };
 }

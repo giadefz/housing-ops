@@ -3,6 +3,7 @@ import { BaseConfig } from "./base.js";
 import { PipelineFileSchema } from "./pipeline.js";
 import { ProfileFileSchema, ProfileSchema } from "./profile.js";
 import { ProvidersFileSchema } from "./providers.js";
+import { PublishersFileSchema } from "./publishers.js";
 
 export {
 	ExtensionApprovalSchema,
@@ -26,6 +27,11 @@ export {
 	type ProviderEntry,
 } from "./providers.js";
 export {
+	PublisherEntrySchema,
+	PublishersFileSchema,
+	type PublisherEntry,
+} from "./publishers.js";
+export {
 	InteractionInputSchema,
 	ProfileGetSchema,
 	ProfileSetSchema,
@@ -42,6 +48,7 @@ export const CONFIG_FILES = [
 	"profile.yml",
 	"pipeline.yml",
 	"providers.yml",
+	"publishers.yml",
 	"extensions.yml",
 ] as const;
 
@@ -53,5 +60,6 @@ export const ConfigSchemas: Record<ConfigFile, z.ZodType> = {
 	"profile.yml": ProfileFileSchema,
 	"pipeline.yml": PipelineFileSchema,
 	"providers.yml": ProvidersFileSchema,
+	"publishers.yml": PublishersFileSchema,
 	"extensions.yml": BaseConfig,
 };

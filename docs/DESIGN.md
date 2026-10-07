@@ -97,8 +97,8 @@ Reach each doc on exactly these branches:
   status transitions; rechecks and delisting; analyses and interactions.
 - **Storage** (`docs/design/storage.md`): tables; migrations; what lives in
   YAML vs the DB.
-- **Config** (`docs/design/config.md`): editing the profile; provider and
-  pipeline files; approving an extension.
+- **Config** (`docs/design/config.md`): editing the profile; provider,
+  pipeline, and publisher files; approving an extension.
 - **API** (`docs/design/api.md`): any command's exact JSON in/out.
 - **Publishers** (`docs/design/publishers.md`): adding a publisher; event
   semantics; the webhook.
