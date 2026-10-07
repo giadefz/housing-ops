@@ -39,6 +39,9 @@ attached.
 ## Status lifecycle
 
 `seen → passed | pending → judged(shortlisted | rejected | held)`.
+`seen` means the offer is in the market and not yet queued; an offer that fails
+the filters stays `seen` and carries that run's failing verdict, so a later scan
+re-evaluates it against changed preferences. A market state closes the offer.
 User states layer on top and never overwrite market states:
 `viewed, favorited, viewing_requested, visited, rejected_by_user(reason)`.
 Market states: `let, sold, gone`.
@@ -48,12 +51,15 @@ full history of a listing is always recoverable. A favorited listing flipping
 to `gone` is surfaced explicitly in the next review session ("you may have
 missed this one").
 
-## Rechecks
+## Staleness and delisting
 
-Known listings re-fetch on a per-provider interval (default 48h,
-`recheck_hours` in `providers.yml`). A recheck that finds changed fields
-stores a new version and emits `offer.updated`; a listing absent from two
-consecutive rechecks flips to `gone`.
+A scan is a snapshot, not a source of truth about absence: search results can
+be loose, capped, or paginated, so a listing missing from a run is not evidence
+it is gone. Each offer carries `fetched_at`, the last time a scan retrieved it,
+shown as a staleness hint to the user. An offer becomes `gone` only when
+delisting is proven — its url no longer resolves (a link check) or the user
+says so. A known listing that reappears with changed fields stores a new
+version (`offer_versions`), the durable record that a change happened.
 
 ## Analysis record
 

@@ -64,9 +64,9 @@ function listing(id: string, overrides: Partial<Listing> = {}): Listing {
 	};
 }
 
-function providerOf(records: unknown[]): ProviderPort {
+function providerOf(records: unknown[], id = "fake"): ProviderPort {
 	return {
-		id: "fake",
+		id,
 		country: "ie",
 		markets: ["rent"],
 		async *fetch(_config: unknown, _context: FetchContext) {
@@ -199,5 +199,37 @@ describe("scan", () => {
 		const offer = await findOfferByListing(database, "fake", "a");
 		expect(offer?.versions).toHaveLength(2);
 		expect(offer?.price.amount).toBe(1800);
+	});
+
+	it("resolves one dwelling for the same address from two providers", async () => {
+		const database = testDatabase();
+		const store = createSqliteStore(database);
+		const shared = {
+			address_text: "1 Same Street, Dublin 8",
+			extra: { ber: "B", eircode: "D08AAAA" },
+		};
+		await scan({
+			providers: [
+				providerOf([listing("x", shared)], "one"),
+				providerOf([listing("y", shared)], "two"),
+			],
+			store,
+			pack: irelandPack,
+			clock,
+			profile: profile(),
+			filters: [budgetStage],
+		});
+		const dwellings: unknown[] = database
+			.prepare("SELECT id FROM dwellings")
+			.all();
+		const offers: unknown[] = database
+			.prepare("SELECT provider, dwelling_id FROM offers")
+			.all();
+		const dwellingIds = offers.map(
+			(row) => (row as { dwelling_id: string }).dwelling_id,
+		);
+		expect(dwellings).toHaveLength(1);
+		expect(offers).toHaveLength(2);
+		expect(new Set(dwellingIds).size).toBe(1);
 	});
 });

@@ -48,10 +48,16 @@ Open risks to grill: scraping ToS per country; deduping the same listing across 
 - [x] Phase 2 slice 2c: `provider list` + composition/entry split + injected dependencies (D43–D44, 80 tests), committed as `3a5d49d`
 - [x] Phase 2 slice 2d: `scan` pipeline (fetch→normalize→store, per-record dead-letter; D45) + change-only versions (83 tests), committed as `b259c46` — **Phase 2 complete**
 - [x] Phase 3 — filters: contract + ordered runner, `pipeline.yml`, `filter list`/`check`, country gating, local discovery (approved `filters.local`), built-ins budget/bedrooms/location/type/size (102 tests; type/size uncommitted)
-- [ ] Next: Phase 4 — dedup + statuses + recheck. Plan: `docs/plans/phase-4.md`
+- [ ] Next: Phase 4 — dedup + version history (recheck/delisting cut per D46–D48). Plan: `docs/plans/phase-4.md`
 - [ ] Round 3+: scheduling, security of user-authored code, testing/CI, license
 
 ## Decisions
+
+### Phase 4 scope (2026-10-07)
+
+- **D46 — Delisting is proven, never inferred.** A scan is a snapshot, not a source of truth about absence: search results can be loose, capped, or paginated, so a listing missing from a run is not evidence it is gone. Counting consecutive misses (`consecutive_misses` column + `listKnownOfferIds`) is dropped. An offer becomes `gone` only when delisting is proven — its url no longer resolves (a future link check) or the user claims it. `markMarketOutcome` stays for that proven path. Amends the recheck-to-`gone` rule of D22 and the Rechecks section of `offer.md`.
+- **D47 — No event surface in Phase 4; `offer_versions` is the change record.** A known listing that reappears with changed fields appends an `offer_versions` row (existing `nextVersions`/`hasChanged`); Phase 4 only detects this and tests the new row — it emits no event and adds no table. Notifications, if ever needed, hang off `offer_versions` (e.g. Phase 6 publishers). Amends the `offer.updated` promise of D22/`offer.md`.
+- **D48 — `seen` means in-market, not yet queued; filtered-out lives in verdicts.** A filtered-out offer keeps status `seen` so a later scan re-filters it against changed preferences; the failure is expressed by its per-run verdict. No `filtered_out` status is added. Amends the lifecycle wording of D22/`offer.md`.
 
 ### Restructure (2026-10-04)
 
