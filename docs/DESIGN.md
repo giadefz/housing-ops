@@ -26,7 +26,7 @@ them with exactly these meanings:
 - **triage** — the cheap verdict tier (`pass | reject | hold` + one line).
 - **analyse** — the deep verdict tier (pros/cons, price sanity, red flags,
   recommendation + confidence).
-- **digest** — the output of `prefs digest`: explicit prefs plus learned
+- **digest** — the output of `profile digest`: explicit profile plus learned
   signal, the agent's working picture of your taste.
 - **approval** — a recorded user approval to run an extension, with its file
   hash in `extensions.yml`. A changed file voids its approval until re-approved.
@@ -136,8 +136,9 @@ Phases run in order; each phase's criterion is the gate to the next.
   Done when: re-running `scan` creates no duplicate dwellings or offers, the
   same dwelling on two providers is one dwelling/two offers, and a price change
   appends a version.
-- **Phase 5 — queue + prefs.** `queue`, `verdict set`, `interact`, `prefs`
-  commands.
+- **Phase 5 — queue + profile.** `queue`, `verdict set`, `interact`, `profile`
+  commands; two-tier judgment with `screened` (D49–D53). Plan:
+  `docs/plans/phase-5.md`.
   Done when: triage → analyse → react runs entirely through commands with
   every record persisted and the digest reflecting the new signal.
 - **Phase 6 — publishers + gate.** Webhook publisher; gate on/off mechanics;

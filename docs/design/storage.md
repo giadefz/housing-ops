@@ -39,8 +39,8 @@ port, so a new datastore is a new adapter — no core change.
 ## YAML vs DB
 
 Explicit preferences live **only** in `config/profile.yml` (human-editable,
-agent-editable, zod-validated). The DB never caches them — `prefs digest`
-joins YAML prefs with DB stats at call time, so there is exactly one place
+agent-editable, zod-validated). The DB never caches them — `profile digest`
+joins the YAML profile with DB stats at call time, so there is exactly one place
 where "what I want" is written.
 
 ## Migrations

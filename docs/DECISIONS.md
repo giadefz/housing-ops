@@ -49,10 +49,21 @@ Open risks to grill: scraping ToS per country; deduping the same listing across 
 - [x] Phase 2 slice 2d: `scan` pipeline (fetch→normalize→store, per-record dead-letter; D45) + change-only versions (83 tests), committed as `b259c46` — **Phase 2 complete**
 - [x] Phase 3 — filters: contract + ordered runner, `pipeline.yml`, `filter list`/`check`, country gating, local discovery (approved `filters.local`), built-ins budget/bedrooms/location/type/size (102 tests; type/size uncommitted)
 - [x] Phase 4 — dedup + version history (recheck/delisting cut per D46–D48; 107 tests) — **Phase 4 complete**
-- [ ] Next: Phase 5 — queue + prefs (`queue`, `verdict set`, `interact`, `prefs`)
+- [ ] Next: implement Phase 5 — queue + profile. Plan: `docs/plans/phase-5.md` (D49–D54 settled)
 - [ ] Round 3+: scheduling, security of user-authored code, testing/CI, license
 
 ## Decisions
+
+### Phase 5 scope (2026-10-07, in progress)
+
+Settled while drafting `docs/plans/phase-5.md`.
+
+- **D49 — Judgment model: two tiers, `screened`.** Triage verdicts are `screened | reject | hold`; analyse verdicts are `shortlist | reject | hold`. Statuses: `pending` (gate on: cleared filters, waiting for triage), `passed` (gate off: cleared filters; terminal for the pipeline but reviewable by the agent), `screened` (new: cleared triage, waiting for deep analysis), `shortlisted | rejected | held` (outcomes). Lifecycle: `seen → passed | pending`; `pending → screened | rejected | held`; `passed → screened | rejected | held`; `screened → shortlisted | rejected | held`. Rule: triage first, analysis second, everywhere — triage inputs are `pending` and `passed`, the analysis input is always `screened`. `screened` is a triage word only, so `pass` stays a filter verdict only and the old pass/passed overload disappears. Code/docs: add `screened` to `OFFER_STATUSES`; replace `pass` with `screened` in `ANALYSIS_VERDICTS`; validate verdicts per tier; update the `offer.md` lifecycle and `api.md` `--verdict` values.
+- **D50 — Re-judging allowed from any non-closed state.** A new verdict supersedes an earlier one (which stays in history); only `let | sold | gone` are frozen. Matches "a later analysis supersedes the earlier triage; both kept."
+- **D51 — `queue` shape.** Default `--status pending`; default `--limit 20`; `data` is `{ offers: OfferSummary[], total }` so the agent sees how many remain. The flow doc says which status each step uses (`pending`/`passed` for triage, `screened` for analysis).
+- **D52 — `profile get` / `profile set`.** Pure `readProfileValue(profile, path)` / `setProfileValue(profile, path, jsonValue)` (dotted path, JSON value, whole-result `ProfileSchema` validation, loud failure). Writing is an injected `writeProfile(root, profile)` capability (`defaults` uses fs + `yaml.dump`, always `version: 1`); only `profile.yml` is writable this way. A machine write reformats the file and drops comments (`js-yaml` cannot preserve them) — accepted for v1 and documented in `config.md`.
+- **D53 — `profile digest` is deterministic facts, with citations.** Signal is interactions only (D20: user behavior; agent analyses deferred). Stats: `favorited` (count + `OfferSummary` examples carrying ids), `rejected` (count + top reasons from `interact --reason`), `priceBands` (min/median/max over favorited vs. all offers), `topFeatures` (layout/bedrooms/BER frequency among favorited), and a `seen` vs `neverShown` count (from `viewed` interactions, per `offer.md`). Assembled by compact store projections (like `queue.ts`) and a core digest service stamping `generatedAt` from the clock. No embeddings — the DB stays the search surface. Examples include ids so the agent's memory claims can cite evidence.
+- **D54 — Agent-layer cited memory (Muse-inspired); deferred to Phase 7.** The agent keeps Markdown memory in the workspace: a curated `TASTE.md` plus dated session logs, where each claim cites evidence (offer/interaction/analysis ids from the DB). A newer claim supersedes an older one, both kept (mirrors D50); forgetting stages a retraction. A session-end or cron "dream" distills logs into the curated sheet (D27: no daemon). The core never reads these files, and `profile.yml` stays the single source of "what I want" — a claim that firms up becomes a `profile set` edit, not a memory-only fact. No embeddings in v1.
 
 ### Phase 4 scope (2026-10-07)
 
@@ -84,7 +95,7 @@ Open risks to grill: scraping ToS per country; deduping the same listing across 
 
 - **D29 — Provider shape confirmed:** ProviderPort `{ id, country, markets, schema, fetch(cfg, ctx) → Listing[] }`; interchange = documented listing JSON v1 envelope. **Process adapter is the primary extension path** (declared in `providers.yml`: `command, args, env, output: jsonl|json|file, timeout`; core may inject hard profile constraints as args where the tool supports them). Module adapter (TS/JS) for npm libs / plain HTTP. Mapping to canonical Offer stays flexible (declarative field map or tiny mapping module) until real data is seen.
 - **D30 — v1 example provider configs:** **daft via `daftlistings`** (MIT, active, gateway API; process adapter over a `python -c` JSONL wrapper) as the primary worked example + `daft-scraper` as documented fallback (SSR path, independent failure mode, stale + 403 risk); **myhome via minimal in-house module adapter** (search-page `__NEXT_DATA__` parsing) with the Apify actor documented as paid hosted alternative; **rent.ie via minimal in-house module adapter** (RSS + SSR detail pages). Each ≤ ~100 lines, explicitly thin/replaceable, any entry swappable via `providers.yml`; ToS-flagged + paced (D26).
-- **D31 — v1 agent flow list confirmed:** `setup` · `review` · `triage + analyse` · `author-filter` · `add-provider` · `tune-prefs` · `doctor` · optional `draft-message` (drafted only, never sent).
+- **D31 — v1 agent flow list confirmed:** `setup` · `review` · `triage + analyse` · `author-filter` · `add-provider` · `tune-profile` · `doctor` · optional `draft-message` (drafted only, never sent).
 
 ### Round 3 (2026-10-03)
 
@@ -133,16 +144,16 @@ flowchart LR
   end
 
   REC --> DB[("history DB")]
-  DB --> DG["prefs digest<br/>explicit prefs + learned signal"]
+  DB --> DG["profile digest<br/>explicit profile + learned signal"]
   DG -->|agent context| NEXT["next triage · filter tweaks<br/>· profile edits"]
   S -.->|optional| HOOK["webhook publisher"]
 ```
 
-- **D16 — Filter contract (v0, provisional):** `id / schema / evaluate({offer, prefs, history}) → pass|fail|skip`. Kept deliberately flexible — finalised at implementation once real provider data is known. Built-in filter list also provisional: to be validated against what the scrapers/APIs actually return (Q5 note from user).
+- **D16 — Filter contract (v0, provisional):** `id / schema / evaluate({offer, profile, history}) → pass|fail|skip`. Kept deliberately flexible — finalised at implementation once real provider data is known. Built-in filter list also provisional: to be validated against what the scrapers/APIs actually return (Q5 note from user).
 - **D17 — Canonical Offer schema confirmed** (incl. `available_from`, `agency`, raw JSON snapshot, eircode); versioned immutable snapshots; verdicts/interactions in separate tables.
 - **D18 — Provider contract confirmed:** HTTP-only in core; SSRF guards; auth/cookie-gated → `providers.local/` (untrusted, explicit enable). IE default bundle: **Daft + MyHome + Rent.ie**.
 - **D19 — Publishers v1 narrowed:** Telegram OUT of v1. Terminal = the to-evaluate queue the user checks via the agent. Only v1 built-in publisher: a **simple webhook** (optional, low priority).
-- **D20 — Preferences confirmed:** explicit `config/profile.yml` (zod) + implicit `interactions` table + `prefs digest` command; no embeddings in v1; `viewed` recorded when the agent surfaces an offer.
+- **D20 — Preferences confirmed:** explicit `config/profile.yml` (zod) + implicit `interactions` table + `profile digest` command; no embeddings in v1; `viewed` recorded when the agent surfaces an offer.
 - **D21 — Onboarding confirmed:** conversational, in the harness (`housing-ops setup` or "set me up"); writes profile/pipeline/providers.yml + initialises DB; zod-validated on read; `doctor` re-validates anytime.
 
 ### Round 2 — interface discussion (2026-10-03)

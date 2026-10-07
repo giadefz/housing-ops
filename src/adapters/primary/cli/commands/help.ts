@@ -9,7 +9,7 @@ const commands = [
 	{ name: "queue", status: "planned (Phase 5)" },
 	{ name: "verdict set", status: "planned (Phase 5)" },
 	{ name: "interact", status: "planned (Phase 5)" },
-	{ name: "prefs", status: "planned (Phase 5)" },
+	{ name: "profile", status: "planned (Phase 5)" },
 	{ name: "filter list", status: "implemented" },
 	{ name: "filter check <id>", status: "implemented" },
 	{ name: "provider list", status: "implemented" },

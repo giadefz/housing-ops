@@ -26,9 +26,9 @@ against a mismatched api version and tells the user to update.
 | `offer get <id>` | id | `{ offer, verdicts }` — the offer carries versions, analyses, interactions |
 | `verdict set <id> --tier triage\|analyse --verdict pass\|shortlist\|reject\|hold --reason ... [--pros ...] [--cons ...] [--price-assessment ...] [--red-flags ...] [--recommendation ...] [--confidence 0-1]` | id + fields | `{ analysis_id }` |
 | `interact <id> --action viewed\|favorited\|rejected\|viewing-requested\|visited\|shared [--reason ...]` | id + fields | `{ interaction_id, status }` — resulting user state |
-| `prefs digest` | — | `{ profile, stats: { favorited, rejected, price_bands, top_features }, generated_at }` |
-| `prefs get [path]` | optional path | profile subtree |
-| `prefs set <path> <json-value>` | path + value | `{ path, value }` — validated write, fails loudly on bad input |
+| `profile digest` | — | `{ profile, stats: { favorited, rejected, price_bands, top_features }, generated_at }` |
+| `profile get [path]` | optional path | profile subtree |
+| `profile set <path> <json-value>` | path + value | `{ path, value }` — validated write, fails loudly on bad input |
 | `filter list` | — | `{ filters: [{ id, enabled, missing, available }] }` |
 | `filter check <id>` | id | `{ evaluated, pass, fail, skip, examples: [{ offerId, outcome, reason }] }` |
 | `provider list` | — | `{ providers: [{ id, type, country, markets, enabled }] }` |

@@ -52,7 +52,7 @@ flowchart LR
   S --> Q["To-evaluate queue"]
   Q --> T["Agent triage + deep analysis"]
   T --> Y["You react<br/>(favorite / reject + reason / ...)"]
-  Y --> D["Preference digest"]
+  Y --> D["Profile digest"]
   D -->|"learns what you like"| T
 ```
 
@@ -122,7 +122,7 @@ src/
   core/
     domain/              # dwelling, offer, listing, profile… — pure, zod only
     ports/               # provider, filter, store, publisher, clock contracts
-    services/            # use cases: validate, scan, verdicts, prefs…
+    services/            # use cases: validate, scan, verdicts, profile…
   adapters/
     primary/cli/         # argv, dispatch, envelope printing
     secondary/           # file reading, command runner, registries

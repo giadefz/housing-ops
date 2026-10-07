@@ -8,7 +8,7 @@ each failure with the file, the path, and the fix.
   currency, …}`, `areas`, `type {layouts, bedrooms, size_m2, …}`,
   `deal_breakers`, `notes` (free text the agent reads), `gate: on|off`,
   `recheck_hours`. Written by onboarding, edited by conversation afterwards
-  (`prefs set` for single values, direct YAML edits for the rest — both
+  (`profile set` for single values, direct YAML edits for the rest — both
   validated).
 - **`pipeline.yml`** — ordered filters with `enabled`, `missing: skip|fail`,
   and per-filter `config` (see `filters.md`).

@@ -37,11 +37,11 @@ file plus the api surface.
   test` on a capped sample → inspect interchange validity → on approval, pin
   (if local code) and enable in `providers.yml`.
   Done when: `scan --provider <id>` stores real canonical offers.
-- **tune-prefs** — triggers: "what do I like", repeated holds, "tighten/loosen
+- **tune-profile** — triggers: "what do I like", repeated holds, "tighten/loosen
   the search".
-  Steps: `prefs digest` → compare explicit prefs against favorited-vs-rejected
-  stats → propose concrete profile or pipeline edits with predicted effect →
-  apply on approval via `prefs set` or YAML edit → `doctor`.
+  Steps: `profile digest` → compare the explicit profile against
+  favorited-vs-rejected stats → propose concrete profile or pipeline edits with
+  predicted effect → apply on approval via `profile set` or YAML edit → `doctor`.
   Done when: the user accepts or rejects each proposal, and accepted edits
   validate.
 - **doctor** — triggers: session start, after any config edit, on any
