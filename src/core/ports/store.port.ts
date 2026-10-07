@@ -66,6 +66,13 @@ export interface StoredOfferDetail {
 	dwelling: Dwelling;
 }
 
+/** A market outcome observation to append while closing an offer. */
+export interface MarketOutcomeEvent {
+	outcome: MarketOutcome;
+	observedAt: string;
+	runId?: string;
+}
+
 /** Persists and queries offers. Implemented by storage adapters. */
 export interface OfferStorePort {
 	saveDwelling(dwelling: Dwelling): Promise<void>;
@@ -91,11 +98,7 @@ export interface OfferStorePort {
 	startRun(provider: string): Promise<string>;
 	finishRun(runId: string, stats: RunStats): Promise<void>;
 	recordDeadLetter(entry: DeadLetterEntry): Promise<void>;
-	markMarketOutcome(
-		offerId: string,
-		outcome: MarketOutcome,
-		observedAt: string,
-	): Promise<void>;
+	recordMarketOutcome(offer: Offer, event: MarketOutcomeEvent): Promise<void>;
 }
 
 /** An open store plus its lifecycle. What composition holds and closes. */

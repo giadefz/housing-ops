@@ -123,17 +123,20 @@ function toDomain(record: unknown): StoredOffer {
 	};
 }
 
-/** Persists an offer record and any new versions. Re-saving is idempotent. */
+/** Writes an offer record and any new versions. Re-writing is idempotent. */
+export function writeOffer(database: Database.Database, offer: Offer): void {
+	upsertOfferRecord(database, offer);
+	for (const version of offer.versions)
+		insertVersion(database, offer.id, version);
+}
+
+/** Persists an offer and any new versions in one transaction. */
 export async function saveOffer(
 	database: Database.Database,
 	offer: Offer,
 ): Promise<void> {
-	const save = database.transaction((current: Offer) => {
-		upsertOfferRecord(database, current);
-		for (const version of current.versions)
-			insertVersion(database, current.id, version);
-	});
-	save(offer);
+	const save = database.transaction(() => writeOffer(database, offer));
+	save();
 }
 
 function upsertOfferRecord(database: Database.Database, offer: Offer): void {

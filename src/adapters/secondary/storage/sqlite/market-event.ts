@@ -1,7 +1,9 @@
 import crypto from "node:crypto";
 import type Database from "better-sqlite3";
-import type { MarketOutcome } from "../../../../core/domain/offer.js";
+import type { Offer } from "../../../../core/domain/offer.js";
+import type { MarketOutcomeEvent } from "../../../../core/ports/store.port.js";
 import type { TableDefinition } from "./migrate.js";
+import { writeOffer } from "./offer.js";
 
 /** Market events table. Let/sold/gone observations, append-only. */
 export const marketEventTable: TableDefinition = {
@@ -17,29 +19,25 @@ CREATE TABLE market_events (
 );`,
 };
 
-/** Records a market outcome and closes the offer in one transaction. */
-export async function markMarketOutcome(
+/** Closes an offer and appends the market event in one transaction. */
+export function recordMarketOutcome(
 	database: Database.Database,
-	offerId: string,
-	outcome: MarketOutcome,
-	observedAt: string,
-	runId?: string,
-): Promise<void> {
-	const mark = database.transaction(() => {
+	offer: Offer,
+	event: MarketOutcomeEvent,
+): void {
+	const close = database.transaction(() => {
+		writeOffer(database, offer);
 		database
 			.prepare(
 				"INSERT INTO market_events (id, offer_id, outcome, observed_at, run_id) VALUES (?, ?, ?, ?, ?)",
 			)
 			.run(
 				crypto.randomUUID(),
-				offerId,
-				outcome,
-				observedAt,
-				runId ?? null,
+				offer.id,
+				event.outcome,
+				event.observedAt,
+				event.runId ?? null,
 			);
-		database
-			.prepare("UPDATE offers SET status = ? WHERE id = ?")
-			.run(outcome, offerId);
 	});
-	mark();
+	close();
 }

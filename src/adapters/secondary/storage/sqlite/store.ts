@@ -12,7 +12,7 @@ import {
 } from "./dwelling.js";
 import { loadDigest } from "./digest.js";
 import { recordInteraction } from "./interaction.js";
-import { markMarketOutcome } from "./market-event.js";
+import { recordMarketOutcome } from "./market-event.js";
 import { migrate } from "./migrate.js";
 import {
 	findOffer,
@@ -62,8 +62,8 @@ export function createSqliteStore(database: Database.Database): OfferStorePort {
 		recordDeadLetter: async (entry) => {
 			recordDeadLetter(database, entry);
 		},
-		markMarketOutcome: (offerId, outcome, observedAt) =>
-			markMarketOutcome(database, offerId, outcome, observedAt),
+		recordMarketOutcome: async (offer, event) =>
+			recordMarketOutcome(database, offer, event),
 	};
 }
 

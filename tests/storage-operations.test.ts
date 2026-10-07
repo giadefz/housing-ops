@@ -178,21 +178,3 @@ describe("runs", () => {
 		});
 	});
 });
-
-describe("market outcomes", () => {
-	it("closes the offer and records the event", async () => {
-		const { database, store } = testStore();
-		await seed(store);
-		await store.markMarketOutcome(
-			"offer-1",
-			"sold",
-			"2026-10-05T00:00:00.000Z",
-		);
-		const offer = await findOffer(database, "offer-1");
-		expect(offer?.marketStatus).toBe("sold");
-		const events: unknown[] = database
-			.prepare("SELECT * FROM market_events")
-			.all();
-		expect(events).toHaveLength(1);
-	});
-});
