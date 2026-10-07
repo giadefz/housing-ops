@@ -8,9 +8,7 @@ import {
 	InvalidTransitionError,
 	InvalidVerdictError,
 	OfferNotFoundError,
-	UnknownActionError,
 	UnknownStatusError,
-	UnknownTierError,
 } from "../../../core/errors/offer.js";
 import {
 	ProviderError,
@@ -48,8 +46,6 @@ const failureSpecs = new Map<AppErrorClass, FailureSpec>([
 			hint: "run housing-ops help for the status list",
 		},
 	],
-	[UnknownTierError, { code: "UNKNOWN_TIER" }],
-	[UnknownActionError, { code: "UNKNOWN_ACTION" }],
 	[ProfilePathError, { code: "PROFILE_PATH_NOT_FOUND" }],
 	[InvalidProfileValueError, { code: "INVALID_PROFILE_VALUE" }],
 	[InvalidDwellingError, { code: "INVALID_DWELLING" }],

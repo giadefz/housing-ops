@@ -120,18 +120,6 @@ describe("interact", () => {
 		});
 	});
 
-	it("rejects an unknown action", async () => {
-		const store = await seed("passed");
-		await expect(
-			interact({
-				store,
-				clock,
-				id: "offer-1",
-				input: { action: "loved" },
-			}),
-		).rejects.toThrow(/unknown interaction action/);
-	});
-
 	it("rejects reactions on closed listings", async () => {
 		const store = await seed("gone");
 		await expect(

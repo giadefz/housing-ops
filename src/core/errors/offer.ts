@@ -24,22 +24,6 @@ export class UnknownStatusError extends AppError {
 	}
 }
 
-/** Thrown when a judgment tier is not `triage` or `analyse`. */
-export class UnknownTierError extends AppError {
-	constructor(tier: string) {
-		super(`unknown judgment tier: ${tier}`);
-		this.name = "UnknownTierError";
-	}
-}
-
-/** Thrown when a user action is not a known interaction action. */
-export class UnknownActionError extends AppError {
-	constructor(action: string) {
-		super(`unknown interaction action: ${action}`);
-		this.name = "UnknownActionError";
-	}
-}
-
 /** Thrown when an offer is requested but not stored. */
 export class OfferNotFoundError extends AppError {
 	constructor(id: string) {

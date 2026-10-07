@@ -2,6 +2,7 @@ import type { Listing } from "../domain/listing.js";
 import type { Offer, OfferStatus } from "../domain/offer.js";
 import type { Verdict } from "../domain/verdict.js";
 import type { Profile } from "../schemas/profile.js";
+import type { InteractionInput, VerdictInput } from "../schemas/requests.js";
 import type { FeatureCount, OfferSummary } from "./store.port.js";
 
 /** Core and api versions, for compatibility checks between core and interfaces. */
@@ -56,28 +57,9 @@ export interface QueueResult {
 	total: number;
 }
 
-/** A judgment to record on an offer. */
-export interface VerdictInput {
-	tier: string;
-	verdict: string;
-	reason: string;
-	pros?: string[];
-	cons?: string[];
-	priceAssessment?: string;
-	redFlags?: string[];
-	recommendation?: string;
-	confidence?: number;
-}
-
 /** The id of the recorded judgment. */
 export interface VerdictResult {
 	analysisId: string;
-}
-
-/** A user reaction to record on an offer. */
-export interface InteractionInput {
-	action: string;
-	reason?: string;
 }
 
 /** The recorded reaction's id and the resulting status. */

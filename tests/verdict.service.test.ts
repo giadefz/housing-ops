@@ -122,18 +122,6 @@ describe("setVerdict", () => {
 		});
 	});
 
-	it("rejects an unknown tier", async () => {
-		const store = await seed("pending");
-		await expect(
-			setVerdict({
-				store,
-				clock,
-				id: "offer-1",
-				input: { tier: "deep", verdict: "reject", reason: "x" },
-			}),
-		).rejects.toThrow(/tier/);
-	});
-
 	it("rejects a verdict outside its tier", async () => {
 		const store = await seed("pending");
 		await expect(

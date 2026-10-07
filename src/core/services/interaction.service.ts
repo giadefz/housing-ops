@@ -1,17 +1,11 @@
 import crypto from "node:crypto";
 import type { Interaction } from "../domain/analysis.js";
-import {
-	isUserAction,
-	recordUserAction,
-	type UserAction,
-} from "../domain/offer.js";
-import { OfferNotFoundError, UnknownActionError } from "../errors/offer.js";
-import type {
-	InteractionInput,
-	InteractionResult,
-} from "../ports/application.port.js";
+import { recordUserAction } from "../domain/offer.js";
+import type { InteractionResult } from "../ports/application.port.js";
 import type { ClockPort } from "../ports/clock.port.js";
 import type { OfferStorePort } from "../ports/store.port.js";
+import type { InteractionInput } from "../schemas/requests.js";
+import { requireOffer } from "./offer.service.js";
 
 /** One request to record a user reaction on an offer. */
 export interface InteractionRequest {
@@ -26,34 +20,24 @@ export async function interact(
 	request: InteractionRequest,
 ): Promise<InteractionResult> {
 	const { store, clock, id, input } = request;
-	const offer = await store.findOffer(id);
-	if (offer === null) throw new OfferNotFoundError(id);
-	const action = parseAction(input.action);
-	const updated = recordUserAction(offer, action);
-	const interaction = toInteraction({ id, action, input, at: clock.now() });
+	const offer = await requireOffer(store, id);
+	const updated = recordUserAction(offer, input.action);
+	const interaction = toInteraction(id, input, clock.now());
 	await store.saveOffer(updated);
 	await store.recordInteraction(interaction);
 	return { interactionId: interaction.id, status: updated.status };
 }
 
-function parseAction(value: string): UserAction {
-	if (!isUserAction(value)) throw new UnknownActionError(value);
-	return value;
-}
-
-interface InteractionSource {
-	id: string;
-	action: UserAction;
-	input: InteractionInput;
-	at: string;
-}
-
-function toInteraction(source: InteractionSource): Interaction {
+function toInteraction(
+	id: string,
+	input: InteractionInput,
+	at: string,
+): Interaction {
 	return {
 		id: crypto.randomUUID(),
-		offerId: source.id,
-		action: source.action,
-		reason: source.input.reason,
-		createdAt: source.at,
+		offerId: id,
+		action: input.action,
+		reason: input.reason,
+		createdAt: at,
 	};
 }

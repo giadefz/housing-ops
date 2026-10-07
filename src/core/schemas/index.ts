@@ -25,6 +25,12 @@ export {
 	ProvidersFileSchema,
 	type ProviderEntry,
 } from "./providers.js";
+export {
+	InteractionInputSchema,
+	VerdictInputSchema,
+	type InteractionInput,
+	type VerdictInput,
+} from "./requests.js";
 
 export const CONFIG_FILES = [
 	"profile.yml",
