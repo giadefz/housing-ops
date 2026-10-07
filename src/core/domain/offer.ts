@@ -1,5 +1,16 @@
-import { InvalidTransitionError } from "../errors/offer.js";
-import type { Analysis, Interaction } from "./analysis.js";
+import {
+	InvalidTransitionError,
+	InvalidVerdictError,
+} from "../errors/offer.js";
+import {
+	ANALYSE_VERDICTS,
+	INTERACTION_ACTIONS,
+	TRIAGE_VERDICTS,
+	type Analysis,
+	type AnalysisTier,
+	type AnalysisVerdict,
+	type Interaction,
+} from "./analysis.js";
 
 /** All markets. Single source for the Market union. */
 export const MARKETS = ["rent", "buy"] as const;
@@ -49,6 +60,7 @@ export const OFFER_STATUSES = [
 	"seen",
 	"passed",
 	"pending",
+	"screened",
 	"shortlisted",
 	"rejected",
 	"held",
@@ -65,76 +77,108 @@ export const OFFER_STATUSES = [
 /** Every status an offer can hold. */
 export type OfferStatus = (typeof OFFER_STATUSES)[number];
 
-/** A market verdict on one offer. */
-export type AgentVerdict = "shortlist" | "reject" | "hold";
+/** True when a value is a known offer status. */
+export function isOfferStatus(value: string): value is OfferStatus {
+	return (OFFER_STATUSES as readonly string[]).includes(value);
+}
 
 /** A user reaction that moves status. Sharing leaves status untouched. */
-export type UserAction =
-	| "viewed"
-	| "favorited"
-	| "rejected"
-	| "viewing-requested"
-	| "visited"
-	| "shared";
+export type UserAction = (typeof INTERACTION_ACTIONS)[number];
+
+/** True when a value is a known user action. */
+export function isUserAction(value: string): value is UserAction {
+	return (INTERACTION_ACTIONS as readonly string[]).includes(value);
+}
 
 /** A market outcome that closes the listing. */
 export type MarketOutcome = "let" | "sold" | "gone";
 
-/** Moves a fresh sighting straight to the terminal queue. Only from seen. */
-export function clearFilters(offer: Offer): Offer {
-	rejectUnlessSeen(offer, "clearFilters");
-	return { ...offer, status: "passed" };
-}
+/** Everything that can move an offer's status. */
+export type OfferEvent =
+	"clear" | "park" | AnalysisVerdict | UserAction | MarketOutcome;
 
-/** Parks a fresh sighting for agent judgment. Only from seen. */
-export function parkForJudgment(offer: Offer): Offer {
-	rejectUnlessSeen(offer, "parkForJudgment");
-	return { ...offer, status: "pending" };
-}
+const SELF: unique symbol = Symbol("self");
 
-function rejectUnlessSeen(offer: Offer, action: string): void {
-	if (offer.status !== "seen")
-		throw new InvalidTransitionError(offer.status, action);
-}
+type TransitionTarget = OfferStatus | typeof SELF;
+type Transitions = Partial<Record<OfferEvent, TransitionTarget>>;
 
-const AGENT_VERDICT_STATUS = {
+/** Moves allowed from any open offer: judgments, reactions, and market outcomes. */
+const OPEN_TRANSITIONS: Transitions = {
+	screened: "screened",
 	shortlist: "shortlisted",
 	reject: "rejected",
 	hold: "held",
-} as const;
-
-/** Records an agent judgment. Only on queued offers. */
-export function recordAgentVerdict(offer: Offer, verdict: AgentVerdict): Offer {
-	if (offer.status !== "pending" && offer.status !== "passed") {
-		throw new InvalidTransitionError(offer.status, "recordAgentVerdict");
-	}
-	return { ...offer, status: AGENT_VERDICT_STATUS[verdict] };
-}
-
-const USER_ACTION_STATUS = {
 	viewed: "viewed",
 	favorited: "favorited",
 	rejected: "rejected_by_user",
 	"viewing-requested": "viewing_requested",
 	visited: "visited",
-	shared: null,
-} as const;
+	shared: SELF,
+	let: "let",
+	sold: "sold",
+	gone: "gone",
+};
 
-/** Records a user reaction. Closed listings stay closed. */
-export function recordUserAction(offer: Offer, action: UserAction): Offer {
-	if (
-		offer.status === "let" ||
-		offer.status === "sold" ||
-		offer.status === "gone"
-	) {
-		throw new InvalidTransitionError(offer.status, "recordUserAction");
-	}
-	const status = USER_ACTION_STATUS[action];
-	if (status === null) return offer;
-	return { ...offer, status };
+/** The status machine. A closed offer (let/sold/gone) has no moves. */
+const TRANSITIONS: Record<OfferStatus, Transitions> = {
+	seen: { clear: "passed", park: "pending", ...OPEN_TRANSITIONS },
+	passed: OPEN_TRANSITIONS,
+	pending: OPEN_TRANSITIONS,
+	screened: OPEN_TRANSITIONS,
+	shortlisted: OPEN_TRANSITIONS,
+	rejected: OPEN_TRANSITIONS,
+	held: OPEN_TRANSITIONS,
+	viewed: OPEN_TRANSITIONS,
+	favorited: OPEN_TRANSITIONS,
+	viewing_requested: OPEN_TRANSITIONS,
+	visited: OPEN_TRANSITIONS,
+	rejected_by_user: OPEN_TRANSITIONS,
+	let: {},
+	sold: {},
+	gone: {},
+};
+
+/** Moves an offer along the status machine, or throws when the move is illegal. */
+export function transition(offer: Offer, event: OfferEvent): Offer {
+	const target = TRANSITIONS[offer.status][event];
+	if (target === undefined)
+		throw new InvalidTransitionError(offer.status, event);
+	return { ...offer, status: target === SELF ? offer.status : target };
 }
 
-/** Records a market outcome. Closes the listing. */
+/** Moves a fresh sighting straight to the terminal queue. Only from seen. */
+export function clearFilters(offer: Offer): Offer {
+	return transition(offer, "clear");
+}
+
+/** Parks a fresh sighting for agent judgment. Only from seen. */
+export function parkForJudgment(offer: Offer): Offer {
+	return transition(offer, "park");
+}
+
+/** Verdicts each tier may return. `screened` is triage-only, `shortlist` analysis-only. */
+const TIER_VERDICTS: Record<AnalysisTier, readonly AnalysisVerdict[]> = {
+	triage: TRIAGE_VERDICTS,
+	analyse: ANALYSE_VERDICTS,
+};
+
+/** Records a judgment. A later judgment supersedes the earlier one. */
+export function recordJudgment(
+	offer: Offer,
+	tier: AnalysisTier,
+	verdict: AnalysisVerdict,
+): Offer {
+	if (!TIER_VERDICTS[tier].includes(verdict))
+		throw new InvalidVerdictError(tier, verdict);
+	return transition(offer, verdict);
+}
+
+/** Records a user reaction. Sharing leaves the status untouched. */
+export function recordUserAction(offer: Offer, action: UserAction): Offer {
+	return transition(offer, action);
+}
+
+/** Records a market outcome. Closes the listing; closed is final. */
 export function recordMarketEvent(offer: Offer, outcome: MarketOutcome): Offer {
-	return { ...offer, status: outcome };
+	return transition(offer, outcome);
 }

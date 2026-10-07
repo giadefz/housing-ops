@@ -7,6 +7,7 @@ import {
 	ExtensionsFileSchema,
 } from "../../core/schemas/index.js";
 import type { ConfigFile } from "../../core/schemas/index.js";
+import type { Profile } from "../../core/schemas/profile.js";
 import type { WorkspaceInput } from "../../core/services/validate.service.js";
 import { readSchemaVersion, SCHEMA_VERSION } from "./storage/sqlite/migrate.js";
 
@@ -30,6 +31,15 @@ export function readWorkspace(root: string): WorkspaceInput {
 
 function configPath(root: string, file: ConfigFile): string {
 	return path.join(root, "config", file);
+}
+
+/** Writes profile.yml: the validated profile plus its version tag. */
+export function writeProfile(root: string, profile: Profile): void {
+	fs.writeFileSync(
+		configPath(root, "profile.yml"),
+		yaml.dump({ ...profile, version: 1 }),
+		"utf8",
+	);
 }
 
 export function databasePath(root: string): string {

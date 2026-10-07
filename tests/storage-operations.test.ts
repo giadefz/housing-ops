@@ -12,6 +12,7 @@ import {
 	openStore,
 } from "../src/adapters/secondary/storage/sqlite/store.js";
 import { findOffer } from "../src/adapters/secondary/storage/sqlite/offer.js";
+import { listQueue } from "../src/core/services/queue.service.js";
 
 let cleanups: Array<() => void> = [];
 afterEach(() => {
@@ -87,6 +88,25 @@ describe("queue", () => {
 			status: "seen",
 		});
 		expect(await store.listQueue("passed", 10)).toEqual([]);
+	});
+	it("counts offers by status", async () => {
+		const { store } = testStore();
+		await seed(store);
+		expect(await store.countOffersByStatus("seen")).toBe(1);
+		expect(await store.countOffersByStatus("passed")).toBe(0);
+	});
+	it("lists a page through the service with a total", async () => {
+		const { store } = testStore();
+		await seed(store);
+		const page = await listQueue({ store, status: "seen", limit: 10 });
+		expect(page.offers).toHaveLength(1);
+		expect(page.total).toBe(1);
+	});
+	it("rejects an unknown status", async () => {
+		const { store } = testStore();
+		await expect(
+			listQueue({ store, status: "bogus", limit: 10 }),
+		).rejects.toThrow(/unknown offer status/);
 	});
 });
 

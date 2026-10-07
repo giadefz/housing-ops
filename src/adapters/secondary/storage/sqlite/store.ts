@@ -10,6 +10,7 @@ import {
 	findDwellingById,
 	saveDwelling,
 } from "./dwelling.js";
+import { loadDigest } from "./digest.js";
 import { recordInteraction } from "./interaction.js";
 import { markMarketOutcome } from "./market-event.js";
 import { migrate } from "./migrate.js";
@@ -19,7 +20,7 @@ import {
 	listOfferIds,
 	saveOffer,
 } from "./offer.js";
-import { listQueue } from "./queue.js";
+import { countOffersByStatus, listQueue } from "./queue.js";
 import { finishRun, startRun } from "./run.js";
 import { listVerdicts, recordVerdict } from "./verdict.js";
 
@@ -52,6 +53,9 @@ export function createSqliteStore(database: Database.Database): OfferStorePort {
 		recordInteraction: (interaction) =>
 			recordInteraction(database, interaction),
 		listQueue: async (status, limit) => listQueue(database, status, limit),
+		countOffersByStatus: async (status) =>
+			countOffersByStatus(database, status),
+		loadDigest: async () => loadDigest(database),
 		listStoredOffers: async (limit) => listStoredOffers(database, limit),
 		startRun: (provider) => startRun(database, provider),
 		finishRun: (runId, stats) => finishRun(database, runId, stats),

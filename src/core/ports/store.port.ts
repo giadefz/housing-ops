@@ -16,6 +16,25 @@ export interface OfferSummary {
 	fetchedAt: string;
 }
 
+/** One value with how often it occurred. */
+export interface FeatureCount {
+	value: string;
+	count: number;
+}
+
+/** Aggregates the profile digest needs, gathered at call time. */
+export interface DigestData {
+	favorited: OfferSummary[];
+	rejectedCount: number;
+	rejectedReasons: FeatureCount[];
+	allPrices: number[];
+	offerCount: number;
+	viewedCount: number;
+	layouts: FeatureCount[];
+	bedrooms: FeatureCount[];
+	ber: FeatureCount[];
+}
+
 /** One pipeline run's counters. */
 export interface RunStats {
 	fetched: number;
@@ -60,6 +79,8 @@ export interface OfferStorePort {
 	recordAnalysis(analysis: Analysis): Promise<void>;
 	recordInteraction(interaction: Interaction): Promise<void>;
 	listQueue(status: OfferStatus, limit: number): Promise<OfferSummary[]>;
+	countOffersByStatus(status: OfferStatus): Promise<number>;
+	loadDigest(): Promise<DigestData>;
 	listStoredOffers(limit: number): Promise<StoredOfferDetail[]>;
 	startRun(provider: string): Promise<string>;
 	finishRun(runId: string, stats: RunStats): Promise<void>;

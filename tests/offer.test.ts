@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	clearFilters,
 	parkForJudgment,
-	recordAgentVerdict,
+	recordJudgment,
 	recordMarketEvent,
 	recordUserAction,
 	type Offer,
@@ -41,17 +41,45 @@ describe("filter gate transitions", () => {
 	});
 });
 
-describe("agent verdict transitions", () => {
-	it("judges pending offers", () => {
+describe("judgment transitions", () => {
+	it("records triage verdicts", () => {
 		const pending = { ...seenOffer(), status: "pending" as const };
-		expect(recordAgentVerdict(pending, "shortlist").status).toBe(
+		expect(recordJudgment(pending, "triage", "screened").status).toBe(
+			"screened",
+		);
+		expect(recordJudgment(pending, "triage", "reject").status).toBe(
+			"rejected",
+		);
+		expect(recordJudgment(pending, "triage", "hold").status).toBe("held");
+	});
+	it("records analyse verdicts from screened", () => {
+		const screened = { ...seenOffer(), status: "screened" as const };
+		expect(recordJudgment(screened, "analyse", "shortlist").status).toBe(
 			"shortlisted",
 		);
-		expect(recordAgentVerdict(pending, "reject").status).toBe("rejected");
-		expect(recordAgentVerdict(pending, "hold").status).toBe("held");
+		expect(recordJudgment(screened, "analyse", "reject").status).toBe(
+			"rejected",
+		);
+		expect(recordJudgment(screened, "analyse", "hold").status).toBe("held");
 	});
-	it("rejects verdicts on unseen offers", () => {
-		expect(() => recordAgentVerdict(seenOffer(), "shortlist")).toThrow(
+	it("supersedes an earlier judgment", () => {
+		const shortlisted = { ...seenOffer(), status: "shortlisted" as const };
+		expect(recordJudgment(shortlisted, "analyse", "reject").status).toBe(
+			"rejected",
+		);
+	});
+	it("refuses a verdict that does not belong to its tier", () => {
+		const pending = { ...seenOffer(), status: "pending" as const };
+		expect(() => recordJudgment(pending, "triage", "shortlist")).toThrow(
+			/valid for tier/,
+		);
+		expect(() => recordJudgment(pending, "analyse", "screened")).toThrow(
+			/valid for tier/,
+		);
+	});
+	it("refuses judgments on closed listings", () => {
+		const gone = { ...seenOffer(), status: "gone" as const };
+		expect(() => recordJudgment(gone, "triage", "reject")).toThrow(
 			/transition/,
 		);
 	});
@@ -80,5 +108,9 @@ describe("market event transitions", () => {
 		const passed = { ...seenOffer(), status: "passed" as const };
 		expect(recordMarketEvent(passed, "sold").status).toBe("sold");
 		expect(recordMarketEvent(passed, "let").status).toBe("let");
+	});
+	it("treats a closed listing as final", () => {
+		const gone = { ...seenOffer(), status: "gone" as const };
+		expect(() => recordMarketEvent(gone, "let")).toThrow(/transition/);
 	});
 });

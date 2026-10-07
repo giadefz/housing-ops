@@ -40,12 +40,35 @@ export function listQueue(
 	return records.map((record) => toSummary(record));
 }
 
+/** Counts offers with the given status. */
+export function countOffersByStatus(
+	database: Database.Database,
+	status: OfferStatus,
+): number {
+	const record: unknown = database
+		.prepare("SELECT COUNT(*) AS count FROM offers WHERE status = ?")
+		.get(status);
+	return countOf(record);
+}
+
+function countOf(record: unknown): number {
+	if (
+		typeof record === "object" &&
+		record !== null &&
+		"count" in record &&
+		typeof record.count === "number"
+	) {
+		return record.count;
+	}
+	return 0;
+}
+
 interface StoredPrice {
 	amount: number;
 	currency: string;
 }
 
-function toSummary(record: unknown): OfferSummary {
+export function toSummary(record: unknown): OfferSummary {
 	const parsed = QueueRecordSchema.safeParse(record);
 	if (!parsed.success)
 		throw new CorruptRecordError("queue", "unknown", parsed.error.message);

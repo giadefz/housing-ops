@@ -21,13 +21,22 @@ import type { ClockPort } from "./core/ports/clock.port.js";
 import type { FilterPort } from "./core/ports/filter.port.js";
 import type { ProviderPort } from "./core/ports/provider.port.js";
 import type { OfferStorePort, StoreFactory } from "./core/ports/store.port.js";
+import type { Profile } from "./core/schemas/profile.js";
+import { buildDigest } from "./core/services/digest.service.js";
 import { checkFilter } from "./core/services/filter.service.js";
+import { interact } from "./core/services/interaction.service.js";
 import { getOffer } from "./core/services/offer.service.js";
+import {
+	readProfileValue,
+	setProfileValue,
+} from "./core/services/profile.service.js";
 import {
 	testProvider as runProviderTest,
 	type ProviderTrial,
 } from "./core/services/provider.service.js";
+import { listQueue } from "./core/services/queue.service.js";
 import { scan, type ScanDependencies } from "./core/services/scan.service.js";
+import { setVerdict } from "./core/services/verdict.service.js";
 import {
 	validateWorkspace,
 	type WorkspaceInput,
@@ -42,6 +51,7 @@ const CHECK_EXAMPLE_LIMIT = 5;
 export interface ApplicationDependencies {
 	storeFactory: StoreFactory;
 	readWorkspace: (root: string) => WorkspaceInput;
+	writeProfile: (root: string, profile: Profile) => void;
 	clock: ClockPort;
 	pack: CountryPack;
 	warn: (message: string) => void;
@@ -52,7 +62,8 @@ export async function createApplication(
 	root: string,
 	dependencies: ApplicationDependencies,
 ): Promise<ApplicationPort> {
-	const { storeFactory, readWorkspace, clock, pack, warn } = dependencies;
+	const { storeFactory, readWorkspace, writeProfile, clock, pack, warn } =
+		dependencies;
 	const workspace = readWorkspace(root);
 	const providersText = workspace.configTexts["providers.yml"];
 	const pipelineText = workspace.configTexts["pipeline.yml"];
@@ -73,6 +84,39 @@ export async function createApplication(
 		validateWorkspace: () => validateWorkspace(workspace),
 		getOffer: (id) =>
 			withStore(storeFactory, root, (store) => getOffer(store, id)),
+		listQueue: (status, limit) =>
+			withStore(storeFactory, root, (store) =>
+				listQueue({ store, status, limit }),
+			),
+		setVerdict: (id, input) =>
+			withStore(storeFactory, root, (store) =>
+				setVerdict({ store, clock, id, input }),
+			),
+		interact: (id, input) =>
+			withStore(storeFactory, root, (store) =>
+				interact({ store, clock, id, input }),
+			),
+		getProfile: (path) => ({
+			path: path ?? null,
+			value: readProfileValue(parseProfile(profileText), path),
+		}),
+		setProfile: async (path, value) => {
+			const updated = setProfileValue(
+				parseProfile(profileText),
+				path,
+				value,
+			);
+			writeProfile(root, updated);
+			return { path, value: readProfileValue(updated, path) };
+		},
+		getDigest: () =>
+			withStore(storeFactory, root, (store) =>
+				buildDigest({
+					store,
+					clock,
+					profile: parseProfile(profileText),
+				}),
+			),
 		listProviders: () => listProviderSummaries(providersText),
 		listFilters: () => listFilters(pipelineText, pack.code, filters),
 		checkFilter: (id) =>

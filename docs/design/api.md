@@ -22,12 +22,12 @@ against a mismatched api version and tells the user to update.
 | `validate` | — | `{ findings: [{ name, ok, detail? }] }` — config, schemas, approvals, database, api compat |
 | `version` | — | `{ core, api }` |
 | `scan [--provider id]` | flags | `{ fetched, stored, deadLettered }` |
-| `queue [--status pending] [--limit n]` | flags | `{ offers: [OfferSummary] }` — compact rows, not full offers |
+| `queue [--status status] [--limit n]` | flags | `{ offers: [OfferSummary], total }` — compact rows; default status `pending`, default limit 20 |
 | `offer get <id>` | id | `{ offer, verdicts }` — the offer carries versions, analyses, interactions |
-| `verdict set <id> --tier triage\|analyse --verdict pass\|shortlist\|reject\|hold --reason ... [--pros ...] [--cons ...] [--price-assessment ...] [--red-flags ...] [--recommendation ...] [--confidence 0-1]` | id + fields | `{ analysis_id }` |
+| `verdict set <id> --tier triage\|analyse --verdict screened\|shortlist\|reject\|hold --reason ... [--pros ...] [--cons ...] [--price-assessment ...] [--red-flags ...] [--recommendation ...] [--confidence 0-1]` | id + fields | `{ analysis_id }` |
 | `interact <id> --action viewed\|favorited\|rejected\|viewing-requested\|visited\|shared [--reason ...]` | id + fields | `{ interaction_id, status }` — resulting user state |
-| `profile digest` | — | `{ profile, stats: { favorited, rejected, price_bands, top_features }, generated_at }` |
-| `profile get [path]` | optional path | profile subtree |
+| `profile digest` | — | `{ profile, stats: { favorited: { count, offers }, rejected: { count, reasons }, priceBands: { favorited, overall }, topFeatures: { layouts, bedrooms, ber }, seen: { viewed, total } }, generatedAt }` |
+| `profile get [path]` | optional path | `{ path, value }` |
 | `profile set <path> <json-value>` | path + value | `{ path, value }` — validated write, fails loudly on bad input |
 | `filter list` | — | `{ filters: [{ id, enabled, missing, available }] }` |
 | `filter check <id>` | id | `{ evaluated, pass, fail, skip, examples: [{ offerId, outcome, reason }] }` |

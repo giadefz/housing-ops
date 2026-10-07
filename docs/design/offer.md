@@ -38,11 +38,16 @@ attached.
 
 ## Status lifecycle
 
-`seen → passed | pending → judged(shortlisted | rejected | held)`.
+`seen → passed | pending`. The agent judges in two tiers: triage
+(`pending`/`passed → screened | rejected | held`), then analyse
+(`screened → shortlisted | rejected | held`). `screened` is a triage-only
+verdict; `shortlist` is analysis-only. A later judgment supersedes an earlier
+one, both kept in history.
+
 `seen` means the offer is in the market and not yet queued; an offer that fails
 the filters stays `seen` and carries that run's failing verdict, so a later scan
-re-evaluates it against changed preferences. A market state closes the offer.
-User states layer on top and never overwrite market states:
+re-evaluates it against changed preferences. A market state closes the offer and
+is final. User states layer on top and never overwrite market states:
 `viewed, favorited, viewing_requested, visited, rejected_by_user(reason)`.
 Market states: `let, sold, gone`.
 

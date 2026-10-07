@@ -6,7 +6,12 @@ import {
 	type NewDwelling,
 } from "../domain/dwelling.js";
 import { normalizeListing, type NewOffer } from "../domain/listing.js";
-import type { Offer, OfferStatus, OfferVersion } from "../domain/offer.js";
+import {
+	clearFilters,
+	parkForJudgment,
+	type Offer,
+	type OfferVersion,
+} from "../domain/offer.js";
 import type { Verdict } from "../domain/verdict.js";
 import { errorMessage } from "../errors/message.js";
 import type { ScanResult } from "../ports/application.port.js";
@@ -139,12 +144,13 @@ function judge(offer: Offer, dwelling: Dwelling, wiring: ScanWiring): Judged {
 		profile: wiring.profile,
 		comparables: [],
 	});
-	const status: OfferStatus = run.passed
-		? wiring.profile.gate
-			? "pending"
-			: "passed"
-		: offer.status;
-	return { offer: { ...offer, status }, verdicts: run.verdicts };
+	if (!run.passed) return { offer, verdicts: run.verdicts };
+	return {
+		offer: wiring.profile.gate
+			? parkForJudgment(offer)
+			: clearFilters(offer),
+		verdicts: run.verdicts,
+	};
 }
 
 async function recordVerdicts(

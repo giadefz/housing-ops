@@ -1,6 +1,8 @@
 import type { Listing } from "../domain/listing.js";
-import type { Offer } from "../domain/offer.js";
+import type { Offer, OfferStatus } from "../domain/offer.js";
 import type { Verdict } from "../domain/verdict.js";
+import type { Profile } from "../schemas/profile.js";
+import type { FeatureCount, OfferSummary } from "./store.port.js";
 
 /** Core and api versions, for compatibility checks between core and interfaces. */
 export interface VersionInfo {
@@ -48,6 +50,81 @@ export interface ScanResult {
 	deadLettered: number;
 }
 
+/** One page of the queue for a status, plus the total number of offers in it. */
+export interface QueueResult {
+	offers: OfferSummary[];
+	total: number;
+}
+
+/** A judgment to record on an offer. */
+export interface VerdictInput {
+	tier: string;
+	verdict: string;
+	reason: string;
+	pros?: string[];
+	cons?: string[];
+	priceAssessment?: string;
+	redFlags?: string[];
+	recommendation?: string;
+	confidence?: number;
+}
+
+/** The id of the recorded judgment. */
+export interface VerdictResult {
+	analysisId: string;
+}
+
+/** A user reaction to record on an offer. */
+export interface InteractionInput {
+	action: string;
+	reason?: string;
+}
+
+/** The recorded reaction's id and the resulting status. */
+export interface InteractionResult {
+	interactionId: string;
+	status: OfferStatus;
+}
+
+/** A profile subtree and the path it came from. */
+export interface ProfileValueResult {
+	path: string | null;
+	value: unknown;
+}
+
+/** The path and value written by a profile set. */
+export interface ProfileSetResult {
+	path: string;
+	value: unknown;
+}
+
+/** A price distribution: min, median, and max. */
+export interface PriceStats {
+	min: number;
+	median: number;
+	max: number;
+}
+
+/** The profile digest: explicit profile plus interaction stats. */
+export interface DigestStats {
+	favorited: { count: number; offers: OfferSummary[] };
+	rejected: { count: number; reasons: FeatureCount[] };
+	priceBands: { favorited: PriceStats | null; overall: PriceStats | null };
+	topFeatures: {
+		layouts: FeatureCount[];
+		bedrooms: FeatureCount[];
+		ber: FeatureCount[];
+	};
+	seen: { viewed: number; total: number };
+}
+
+/** One digest run: the profile, the stats, and when it was generated. */
+export interface DigestResult {
+	profile: Profile;
+	stats: DigestStats;
+	generatedAt: string;
+}
+
 /** One configured filter, as listed from pipeline.yml. */
 export interface FilterSummary {
 	id: string;
@@ -82,4 +159,10 @@ export interface ApplicationPort {
 	checkFilter(id: string): Promise<FilterCheckResult>;
 	testProvider(id: string): Promise<ProviderTestResult>;
 	scan(providerId?: string): Promise<ScanResult>;
+	listQueue(status: string, limit: number): Promise<QueueResult>;
+	setVerdict(id: string, input: VerdictInput): Promise<VerdictResult>;
+	interact(id: string, input: InteractionInput): Promise<InteractionResult>;
+	getProfile(path?: string): ProfileValueResult;
+	setProfile(path: string, value: unknown): Promise<ProfileSetResult>;
+	getDigest(): Promise<DigestResult>;
 }

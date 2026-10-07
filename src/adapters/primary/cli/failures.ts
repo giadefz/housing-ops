@@ -6,12 +6,20 @@ import { FilterNotFoundError } from "../../../core/errors/filter.js";
 import { errorMessage } from "../../../core/errors/message.js";
 import {
 	InvalidTransitionError,
+	InvalidVerdictError,
 	OfferNotFoundError,
+	UnknownActionError,
+	UnknownStatusError,
+	UnknownTierError,
 } from "../../../core/errors/offer.js";
 import {
 	ProviderError,
 	ProviderNotFoundError,
 } from "../../../core/errors/provider.js";
+import {
+	InvalidProfileValueError,
+	ProfilePathError,
+} from "../../../core/errors/profile.js";
 import { StoreNotInitializedError } from "../../../core/errors/storage.js";
 import type { Failure } from "./envelope.js";
 
@@ -32,6 +40,18 @@ const failureSpecs = new Map<AppErrorClass, FailureSpec>([
 		},
 	],
 	[InvalidTransitionError, { code: "INVALID_TRANSITION" }],
+	[InvalidVerdictError, { code: "INVALID_VERDICT" }],
+	[
+		UnknownStatusError,
+		{
+			code: "UNKNOWN_STATUS",
+			hint: "run housing-ops help for the status list",
+		},
+	],
+	[UnknownTierError, { code: "UNKNOWN_TIER" }],
+	[UnknownActionError, { code: "UNKNOWN_ACTION" }],
+	[ProfilePathError, { code: "PROFILE_PATH_NOT_FOUND" }],
+	[InvalidProfileValueError, { code: "INVALID_PROFILE_VALUE" }],
 	[InvalidDwellingError, { code: "INVALID_DWELLING" }],
 	[InvalidListingError, { code: "INVALID_LISTING" }],
 	[

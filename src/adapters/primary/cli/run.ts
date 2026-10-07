@@ -4,10 +4,14 @@ import { fail, type Envelope } from "./envelope.js";
 import { toFailure } from "./failures.js";
 import { help } from "./commands/help.js";
 import { filterCommands } from "./commands/filter.js";
+import { interactCommands } from "./commands/interact.js";
 import { offerCommands } from "./commands/offer.js";
+import { profileCommands } from "./commands/profile.js";
 import { providerCommands } from "./commands/provider.js";
+import { queueCommands } from "./commands/queue.js";
 import { scanCommands } from "./commands/scan.js";
 import { systemCommands } from "./commands/system.js";
+import { verdictCommands } from "./commands/verdict.js";
 import type { CommandHandler } from "./commands/types.js";
 
 const commandHandlers: Record<string, CommandHandler> = {
@@ -15,6 +19,10 @@ const commandHandlers: Record<string, CommandHandler> = {
 	...offerCommands,
 	...providerCommands,
 	...filterCommands,
+	...queueCommands,
+	...verdictCommands,
+	...interactCommands,
+	...profileCommands,
 	...scanCommands,
 };
 
