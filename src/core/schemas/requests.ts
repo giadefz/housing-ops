@@ -4,7 +4,7 @@ import {
 	ANALYSIS_VERDICTS,
 	INTERACTION_ACTIONS,
 } from "../domain/analysis.js";
-import { OFFER_STATUSES } from "../domain/offer.js";
+import { MARKET_STATUSES } from "../domain/offer.js";
 
 /** A verdict set request: a tier, a verdict, and its evidence. */
 export const VerdictInputSchema = z.object({
@@ -33,7 +33,7 @@ export type InteractionInput = z.infer<typeof InteractionInputSchema>;
 
 /** A queue request: which status, and how many rows. */
 export const QueueInputSchema = z.object({
-	status: z.enum(OFFER_STATUSES).default("pending"),
+	status: z.enum(MARKET_STATUSES).default("pending"),
 	limit: z.number().int().positive().default(20),
 });
 

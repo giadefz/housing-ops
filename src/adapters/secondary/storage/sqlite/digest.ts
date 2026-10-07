@@ -44,7 +44,8 @@ export function loadDigest(database: Database.Database): DigestData {
 function favoritedSummaries(database: Database.Database): OfferSummary[] {
 	const records: unknown[] = database
 		.prepare(
-			`SELECT o.id AS id, o.provider AS provider, o.price AS price, o.status AS status, o.fetched_at AS fetched_at,
+			`SELECT o.id AS id, o.provider AS provider, o.price AS price, o.status AS status,
+			o.user_status AS user_status, o.fetched_at AS fetched_at,
 			d.address AS address, d.size AS size, d.rooms AS rooms, d.layout AS layout
 			FROM offers o JOIN dwellings d ON d.id = o.dwelling_id
 			WHERE o.id IN ${FAVORITED} ORDER BY o.fetched_at DESC`,

@@ -1,5 +1,5 @@
 import type { Listing } from "../domain/listing.js";
-import type { Offer, OfferStatus } from "../domain/offer.js";
+import type { Offer, UserStatus } from "../domain/offer.js";
 import type { Verdict } from "../domain/verdict.js";
 import type { Profile } from "../schemas/profile.js";
 import type {
@@ -68,10 +68,10 @@ export interface VerdictResult {
 	analysisId: string;
 }
 
-/** The recorded reaction's id and the resulting status. */
+/** The recorded reaction's id and the resulting user status. */
 export interface InteractionResult {
 	interactionId: string;
-	status: OfferStatus;
+	userStatus: UserStatus;
 }
 
 /** A profile subtree and the path it came from. */

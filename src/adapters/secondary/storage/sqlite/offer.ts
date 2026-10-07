@@ -1,6 +1,10 @@
 import type Database from "better-sqlite3";
 import { z } from "zod";
-import { MARKETS, OFFER_STATUSES } from "../../../../core/domain/offer.js";
+import {
+	MARKET_STATUSES,
+	MARKETS,
+	USER_STATUSES,
+} from "../../../../core/domain/offer.js";
 import type { Offer, Price } from "../../../../core/domain/offer.js";
 import { listAnalyses } from "./analysis.js";
 import { listInteractions } from "./interaction.js";
@@ -31,6 +35,7 @@ CREATE TABLE offers (
 	posted_at TEXT,
 	fetched_at TEXT NOT NULL,
 	status TEXT NOT NULL,
+	user_status TEXT NOT NULL DEFAULT 'none',
 	UNIQUE(provider, listing_id)
 );`,
 };
@@ -48,6 +53,7 @@ const OfferRecordSchema = z.object({
 	posted_at: z.string().nullable(),
 	fetched_at: z.string(),
 	status: z.string(),
+	user_status: z.string(),
 });
 
 /** Offers record DTO. JSON columns are text, absent values are null. */
@@ -69,7 +75,8 @@ function toRecord(offer: Offer): OfferRecord {
 		description: offer.description,
 		posted_at: offer.postedAt ?? null,
 		fetched_at: offer.fetchedAt,
-		status: offer.status,
+		status: offer.marketStatus,
+		user_status: offer.userStatus,
 	};
 }
 
@@ -99,12 +106,19 @@ function toDomain(record: unknown): StoredOffer {
 		description: valid.description,
 		postedAt: valid.posted_at ?? undefined,
 		fetchedAt: valid.fetched_at,
-		status: parseEnum(
+		marketStatus: parseEnum(
 			"offers",
 			valid.id,
 			"status",
 			valid.status,
-			OFFER_STATUSES,
+			MARKET_STATUSES,
+		),
+		userStatus: parseEnum(
+			"offers",
+			valid.id,
+			"user_status",
+			valid.user_status,
+			USER_STATUSES,
 		),
 	};
 }
@@ -126,12 +140,12 @@ function upsertOfferRecord(database: Database.Database, offer: Offer): void {
 	const record = toRecord(offer);
 	database
 		.prepare(
-			`INSERT INTO offers (id, dwelling_id, provider, listing_id, url, market, price, images, description, posted_at, fetched_at, status)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			`INSERT INTO offers (id, dwelling_id, provider, listing_id, url, market, price, images, description, posted_at, fetched_at, status, user_status)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			ON CONFLICT(id) DO UPDATE SET dwelling_id = excluded.dwelling_id, provider = excluded.provider,
 			listing_id = excluded.listing_id, url = excluded.url, market = excluded.market, price = excluded.price,
 			images = excluded.images, description = excluded.description, posted_at = excluded.posted_at,
-			fetched_at = excluded.fetched_at, status = excluded.status`,
+			fetched_at = excluded.fetched_at, status = excluded.status, user_status = excluded.user_status`,
 		)
 		.run(
 			record.id,
@@ -146,6 +160,7 @@ function upsertOfferRecord(database: Database.Database, offer: Offer): void {
 			record.posted_at,
 			record.fetched_at,
 			record.status,
+			record.user_status,
 		);
 }
 

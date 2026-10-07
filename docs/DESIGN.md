@@ -33,7 +33,7 @@ them with exactly these meanings:
 - **dwelling** — the physical place. Identity is the normalized address key;
   universal facts plus country-pack attributes.
 - **offer** — a market sighting of a dwelling. Identity is provider plus
-  listing id; price, status, versions, verdicts.
+  listing id; price, market and user statuses, versions, verdicts.
 - **attributes** — country-specific dwelling facts (BER, Eircode, …),
   validated against the active country pack schema.
 - **pack** — a country pack: pure attribute schema, key rules, layout

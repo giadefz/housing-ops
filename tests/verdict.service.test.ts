@@ -46,7 +46,7 @@ function dwellingFixture(): Dwelling {
 	};
 }
 
-function offerFixture(status: Offer["status"]): Offer {
+function offerFixture(marketStatus: Offer["marketStatus"]): Offer {
 	return {
 		id: "offer-1",
 		dwellingId: "dw-1",
@@ -59,18 +59,19 @@ function offerFixture(status: Offer["status"]): Offer {
 		description: "Bright apartment",
 		fetchedAt: "2026-10-04T00:00:00.000Z",
 		versions: [],
-		status,
+		marketStatus,
+		userStatus: "none",
 		analyses: [],
 		interactions: [],
 	};
 }
 
 async function seed(
-	status: Offer["status"],
+	marketStatus: Offer["marketStatus"],
 ): Promise<ReturnType<typeof createSqliteStore>> {
 	const { store } = testStore();
 	await store.saveDwelling(dwellingFixture());
-	await store.saveOffer(offerFixture(status));
+	await store.saveOffer(offerFixture(marketStatus));
 	return store;
 }
 
@@ -88,7 +89,7 @@ describe("setVerdict", () => {
 			},
 		});
 		const loaded = await store.findOffer("offer-1");
-		expect(loaded?.status).toBe("screened");
+		expect(loaded?.marketStatus).toBe("screened");
 		expect(loaded?.analyses).toHaveLength(1);
 		expect(loaded?.analyses[0]).toMatchObject({
 			tier: "triage",
@@ -114,7 +115,7 @@ describe("setVerdict", () => {
 			},
 		});
 		const loaded = await store.findOffer("offer-1");
-		expect(loaded?.status).toBe("shortlisted");
+		expect(loaded?.marketStatus).toBe("shortlisted");
 		expect(loaded?.analyses[0]).toMatchObject({
 			verdict: "shortlist",
 			pros: ["bright", "quiet"],

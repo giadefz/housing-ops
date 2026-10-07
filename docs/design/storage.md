@@ -13,8 +13,8 @@ the row DTO/mapping, and the queries together. `migrate.ts` collects the
 - `dwellings` — `(id, address_key UNIQUE, address, size, rooms, layout,
   year_built, floor, floors_total, attributes)`.
 - `offers` — `(id, dwelling_id → dwellings, provider, listing_id, url,
-  market, price, images, description, posted_at, fetched_at, status)`,
-  `UNIQUE(provider, listing_id)`.
+  market, price, images, description, posted_at, fetched_at, status,
+  user_status)`, `UNIQUE(provider, listing_id)`.
 - `offer_versions` — `(offer_id, version)` primary; `fetched_at`, `price`,
   `payload` (raw snapshot).
 - `verdicts` — `(run_id, offer_id, filter_id, outcome, reason)`.

@@ -120,10 +120,12 @@ describe("end to end", () => {
 			expect(scan).toEqual({ fetched: 3, stored: 2, deadLettered: 1 });
 
 			expect(
-				(await findOfferByListing(database, "fake", "cheap"))?.status,
+				(await findOfferByListing(database, "fake", "cheap"))
+					?.marketStatus,
 			).toBe("passed");
 			expect(
-				(await findOfferByListing(database, "fake", "pricey"))?.status,
+				(await findOfferByListing(database, "fake", "pricey"))
+					?.marketStatus,
 			).toBe("seen");
 
 			const dead: unknown[] = database

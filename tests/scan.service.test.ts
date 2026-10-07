@@ -93,7 +93,7 @@ describe("scan", () => {
 		});
 		expect(result).toEqual({ fetched: 1, stored: 1, deadLettered: 0 });
 		const offer = await findOfferByListing(database, "fake", "a");
-		expect(offer?.status).toBe("passed");
+		expect(offer?.marketStatus).toBe("passed");
 		expect(verdicts(database)).toEqual([
 			{ filter_id: "budget", outcome: "pass" },
 		]);
@@ -111,7 +111,7 @@ describe("scan", () => {
 			filters: [budgetStage],
 		});
 		const offer = await findOfferByListing(database, "fake", "a");
-		expect(offer?.status).toBe("pending");
+		expect(offer?.marketStatus).toBe("pending");
 	});
 
 	it("leaves a filtered-out offer seen and records the failing verdict", async () => {
@@ -126,7 +126,7 @@ describe("scan", () => {
 			filters: [budgetStage],
 		});
 		const offer = await findOfferByListing(database, "fake", "a");
-		expect(offer?.status).toBe("seen");
+		expect(offer?.marketStatus).toBe("seen");
 		expect(verdicts(database)).toEqual([
 			{ filter_id: "budget", outcome: "fail" },
 		]);

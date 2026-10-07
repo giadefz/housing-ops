@@ -1,8 +1,11 @@
 import type Database from "better-sqlite3";
 import { z } from "zod";
 import { toSquareMeters } from "../../../../core/domain/dwelling.js";
-import { OFFER_STATUSES } from "../../../../core/domain/offer.js";
-import type { OfferStatus } from "../../../../core/domain/offer.js";
+import {
+	MARKET_STATUSES,
+	USER_STATUSES,
+} from "../../../../core/domain/offer.js";
+import type { MarketStatus } from "../../../../core/domain/offer.js";
 import type { OfferSummary } from "../../../../core/ports/store.port.js";
 import {
 	CorruptRecordError,
@@ -16,6 +19,7 @@ const QueueRecordSchema = z.object({
 	provider: z.string(),
 	price: z.string(),
 	status: z.string(),
+	user_status: z.string(),
 	fetched_at: z.string(),
 	address: z.string(),
 	size: z.string().nullable(),
@@ -26,12 +30,13 @@ const QueueRecordSchema = z.object({
 /** Queue projection over offers joined to their dwelling. Compact records only. */
 export function listQueue(
 	database: Database.Database,
-	status: OfferStatus,
+	status: MarketStatus,
 	limit: number,
 ): OfferSummary[] {
 	const records: unknown[] = database
 		.prepare(
-			`SELECT o.id AS id, o.provider AS provider, o.price AS price, o.status AS status, o.fetched_at AS fetched_at,
+			`SELECT o.id AS id, o.provider AS provider, o.price AS price, o.status AS status,
+			o.user_status AS user_status, o.fetched_at AS fetched_at,
 			d.address AS address, d.size AS size, d.rooms AS rooms, d.layout AS layout
 			FROM offers o JOIN dwellings d ON d.id = o.dwelling_id
 			WHERE o.status = ? ORDER BY o.fetched_at LIMIT ?`,
@@ -40,10 +45,10 @@ export function listQueue(
 	return records.map((record) => toSummary(record));
 }
 
-/** Counts offers with the given status. */
+/** Counts offers with the given market status. */
 export function countOffersByStatus(
 	database: Database.Database,
-	status: OfferStatus,
+	status: MarketStatus,
 ): number {
 	const record: unknown = database
 		.prepare("SELECT COUNT(*) AS count FROM offers WHERE status = ?")
@@ -106,12 +111,19 @@ export function toSummary(record: unknown): OfferSummary {
 		sizeM2:
 			size === undefined ? undefined : Math.round(toSquareMeters(size)),
 		layout: valid.layout,
-		status: parseEnum(
+		marketStatus: parseEnum(
 			"queue",
 			valid.id,
 			"status",
 			valid.status,
-			OFFER_STATUSES,
+			MARKET_STATUSES,
+		),
+		userStatus: parseEnum(
+			"queue",
+			valid.id,
+			"user_status",
+			valid.user_status,
+			USER_STATUSES,
 		),
 		fetchedAt: valid.fetched_at,
 	};

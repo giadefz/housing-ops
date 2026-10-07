@@ -61,7 +61,8 @@ function offerFixture(id: string, amount: number): Offer {
 		description: "Bright apartment",
 		fetchedAt: "2026-10-04T00:00:00.000Z",
 		versions: [],
-		status: "seen",
+		marketStatus: "seen",
+		userStatus: "none",
 		analyses: [],
 		interactions: [],
 	};

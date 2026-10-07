@@ -16,9 +16,9 @@ dwelling.
   Eircode, …) live in pack-validated `attributes`.
 - **Offer** — identity is the provider plus its native listing id. Carries the
   url, the market (rent or buy), the price, images, description, posting and
-  fetch times, the status, and the versions, analyses, and interactions below.
-  `id` is ours and stable; `listing_id` is the provider's stable id and, with
-  `url`, the dedup key.
+  fetch times, the market and user statuses, and the versions, analyses, and
+  interactions below. `id` is ours and stable; `listing_id` is the provider's
+  stable id and, with `url`, the dedup key.
 
 Missing fields stay missing — filters `skip` on absence per their own `missing`
 policy (`filters.md`), never on invented defaults.
@@ -38,20 +38,25 @@ attached.
 
 ## Status lifecycle
 
-`seen → passed | pending`. The agent judges in two tiers: triage
+An offer carries two independent statuses: **market** (where the listing is)
+and **user** (how you relate to it). They move on their own and never overwrite
+each other — a reaction leaves the market status alone, and a judgment leaves
+the user status alone.
+
+Market: `seen → passed | pending`. The agent judges in two tiers: triage
 (`pending`/`passed → screened | rejected | held`), then analyse
 (`screened → shortlisted | rejected | held`). `screened` is a triage-only
 verdict; `shortlist` is analysis-only. A later judgment supersedes an earlier
-one, both kept in history.
+one, both kept in history. `seen` means the offer is in the market and not yet
+queued; an offer that fails the filters stays `seen` and carries that run's
+failing verdict, so a later scan re-evaluates it against changed preferences.
+`let`, `sold`, and `gone` close the listing and are final.
 
-`seen` means the offer is in the market and not yet queued; an offer that fails
-the filters stays `seen` and carries that run's failing verdict, so a later scan
-re-evaluates it against changed preferences. A market state closes the offer and
-is final. User states layer on top and never overwrite market states:
-`viewed, favorited, viewing_requested, visited, rejected_by_user(reason)`.
-Market states: `let, sold, gone`.
+User: `none → viewed | favorited | viewing_requested | visited | rejected_by_user`.
+A reaction sets the user status; `shared` records the interaction but leaves it
+untouched. Closed listings accept no reactions.
 
-Transitions are append-only events; the current status is derived, so the
+Transitions are append-only events; the current statuses are derived, so the
 full history of a listing is always recoverable. A favorited listing flipping
 to `gone` is surfaced explicitly in the next review session ("you may have
 missed this one").
@@ -70,8 +75,8 @@ version (`offer_versions`), the durable record that a change happened.
 
 Written by `verdict set`, one per tier per offer (a later analyse supersedes the
 earlier triage; both kept). Records the tier (triage or analyse), the verdict
-(pass, shortlist, reject, or hold), a reason, pros and cons, an optional price
-assessment against stored comparables, optional red flags, an optional
+(screened, shortlist, reject, or hold), a reason, pros and cons, an optional
+price assessment against stored comparables, optional red flags, an optional
 recommendation and confidence, the author (agent or user), and the timestamp.
 
 ## Interaction record

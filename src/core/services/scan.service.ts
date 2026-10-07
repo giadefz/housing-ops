@@ -137,7 +137,7 @@ interface Judged {
 
 /** Runs the pipeline on a first sighting; a filtered-out offer stays "seen". */
 function judge(offer: Offer, dwelling: Dwelling, wiring: ScanWiring): Judged {
-	if (offer.status !== "seen") return { offer, verdicts: [] };
+	if (offer.marketStatus !== "seen") return { offer, verdicts: [] };
 	const run = runFilters(wiring.filters, {
 		offer,
 		dwelling,
@@ -203,7 +203,8 @@ async function resolveOffer(job: OfferJob): Promise<Offer> {
 		postedAt: newOffer.postedAt,
 		fetchedAt: newOffer.fetchedAt,
 		versions: nextVersions({ existing, newOffer, payload }),
-		status: existing?.status ?? "seen",
+		marketStatus: existing?.marketStatus ?? "seen",
+		userStatus: existing?.userStatus ?? "none",
 		analyses: existing?.analyses ?? [],
 		interactions: existing?.interactions ?? [],
 	};

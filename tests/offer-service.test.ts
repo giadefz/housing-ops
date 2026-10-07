@@ -54,7 +54,8 @@ function offerFixture(): Offer {
 		description: "Bright apartment",
 		fetchedAt: "2026-10-04T00:00:00.000Z",
 		versions: [],
-		status: "seen",
+		marketStatus: "seen",
+		userStatus: "none",
 		analyses: [],
 		interactions: [],
 	};
@@ -78,7 +79,7 @@ describe("getOffer", () => {
 		await seed(store);
 		const detail = await getOffer(store, "offer-1");
 		expect(detail.offer.id).toBe("offer-1");
-		expect(detail.offer.status).toBe("seen");
+		expect(detail.offer.marketStatus).toBe("seen");
 		expect(detail.verdicts).toEqual([
 			{ filterId: "budget", outcome: "pass", reason: "" },
 		]);

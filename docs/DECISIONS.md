@@ -55,6 +55,10 @@ Open risks to grill: scraping ToS per country; deduping the same listing across 
 
 ## Decisions
 
+### Status model (2026-10-07)
+
+- **D55 — Market and user status are separate fields.** The offer carries `marketStatus` and `userStatus` instead of one `status`; they run on independent machines (market: `seen → … → let/sold/gone`; user: `none → viewed/favorited/viewing_requested/visited/rejected_by_user`). A reaction never overwrites the market status and a judgment never overwrites the user status, making `offer.md`'s "user states layer on top" literally true. The single `OFFER_STATUSES` enum is replaced by `MARKET_STATUSES` + `USER_STATUSES`; `offers.status` holds the market status and `offers.user_status` the user one; `interact` returns `user_status`. This is the parallel-regions model behind the transition-table decision. Supersedes the single-field model of D22; `screened`/`OFFER_STATUSES` wording in D49 now reads as `MARKET_STATUSES`. No data migration: pre-release, the v1 table is rewritten in place.
+
 ### Phase 5 scope (2026-10-07, in progress)
 
 Settled while drafting `docs/plans/phase-5.md`.

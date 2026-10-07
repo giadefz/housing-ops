@@ -1,6 +1,11 @@
 import type { Analysis, Interaction } from "../domain/analysis.js";
 import type { Dwelling } from "../domain/dwelling.js";
-import type { MarketOutcome, Offer, OfferStatus } from "../domain/offer.js";
+import type {
+	MarketOutcome,
+	MarketStatus,
+	Offer,
+	UserStatus,
+} from "../domain/offer.js";
 import type { Verdict } from "../domain/verdict.js";
 
 /** One queue entry. Compact by design: full payloads come from findOffer. */
@@ -12,7 +17,8 @@ export interface OfferSummary {
 	bedrooms?: number;
 	sizeM2?: number;
 	layout: string;
-	status: OfferStatus;
+	marketStatus: MarketStatus;
+	userStatus: UserStatus;
 	fetchedAt: string;
 }
 
@@ -78,8 +84,8 @@ export interface OfferStorePort {
 	listVerdicts(offerId: string): Promise<Verdict[]>;
 	recordAnalysis(analysis: Analysis): Promise<void>;
 	recordInteraction(interaction: Interaction): Promise<void>;
-	listQueue(status: OfferStatus, limit: number): Promise<OfferSummary[]>;
-	countOffersByStatus(status: OfferStatus): Promise<number>;
+	listQueue(status: MarketStatus, limit: number): Promise<OfferSummary[]>;
+	countOffersByStatus(status: MarketStatus): Promise<number>;
 	loadDigest(): Promise<DigestData>;
 	listStoredOffers(limit: number): Promise<StoredOfferDetail[]>;
 	startRun(provider: string): Promise<string>;

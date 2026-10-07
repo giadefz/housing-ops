@@ -58,7 +58,8 @@ function offerFixture(): Offer {
 		description: "Bright apartment",
 		fetchedAt: "2026-10-04T00:00:00.000Z",
 		versions: [],
-		status: "seen",
+		marketStatus: "seen",
+		userStatus: "none",
 		analyses: [],
 		interactions: [],
 	};
@@ -85,7 +86,8 @@ describe("queue", () => {
 			bedrooms: 2,
 			sizeM2: 85,
 			layout: "apartment",
-			status: "seen",
+			marketStatus: "seen",
+			userStatus: "none",
 		});
 		expect(await store.listQueue("passed", 10)).toEqual([]);
 	});
@@ -187,7 +189,7 @@ describe("market outcomes", () => {
 			"2026-10-05T00:00:00.000Z",
 		);
 		const offer = await findOffer(database, "offer-1");
-		expect(offer?.status).toBe("sold");
+		expect(offer?.marketStatus).toBe("sold");
 		const events: unknown[] = database
 			.prepare("SELECT * FROM market_events")
 			.all();

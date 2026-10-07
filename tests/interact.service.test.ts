@@ -46,7 +46,7 @@ function dwellingFixture(): Dwelling {
 	};
 }
 
-function offerFixture(status: Offer["status"]): Offer {
+function offerFixture(marketStatus: Offer["marketStatus"]): Offer {
 	return {
 		id: "offer-1",
 		dwellingId: "dw-1",
@@ -59,18 +59,19 @@ function offerFixture(status: Offer["status"]): Offer {
 		description: "Bright apartment",
 		fetchedAt: "2026-10-04T00:00:00.000Z",
 		versions: [],
-		status,
+		marketStatus,
+		userStatus: "none",
 		analyses: [],
 		interactions: [],
 	};
 }
 
 async function seed(
-	status: Offer["status"],
+	marketStatus: Offer["marketStatus"],
 ): Promise<ReturnType<typeof createSqliteStore>> {
 	const { store } = testStore();
 	await store.saveDwelling(dwellingFixture());
-	await store.saveOffer(offerFixture(status));
+	await store.saveOffer(offerFixture(marketStatus));
 	return store;
 }
 
@@ -84,11 +85,11 @@ describe("interact", () => {
 			input: { action: "favorited" },
 		});
 		const loaded = await store.findOffer("offer-1");
-		expect(loaded?.status).toBe("favorited");
+		expect(loaded?.userStatus).toBe("favorited");
 		expect(loaded?.interactions).toHaveLength(1);
 		expect(loaded?.interactions[0]).toMatchObject({ action: "favorited" });
 		expect(result.interactionId).toBe(loaded?.interactions[0]?.id);
-		expect(result.status).toBe("favorited");
+		expect(result.userStatus).toBe("favorited");
 	});
 
 	it("keeps the status on share but records the reaction", async () => {
@@ -100,7 +101,8 @@ describe("interact", () => {
 			input: { action: "shared" },
 		});
 		const loaded = await store.findOffer("offer-1");
-		expect(result.status).toBe("passed");
+		expect(result.userStatus).toBe("none");
+		expect(loaded?.marketStatus).toBe("passed");
 		expect(loaded?.interactions[0]).toMatchObject({ action: "shared" });
 	});
 
@@ -113,7 +115,7 @@ describe("interact", () => {
 			input: { action: "rejected", reason: "too small" },
 		});
 		const loaded = await store.findOffer("offer-1");
-		expect(loaded?.status).toBe("rejected_by_user");
+		expect(loaded?.userStatus).toBe("rejected_by_user");
 		expect(loaded?.interactions[0]).toMatchObject({
 			action: "rejected",
 			reason: "too small",

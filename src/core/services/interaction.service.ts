@@ -25,7 +25,7 @@ export async function interact(
 	const interaction = toInteraction(id, input, clock.now());
 	await store.saveOffer(updated);
 	await store.recordInteraction(interaction);
-	return { interactionId: interaction.id, status: updated.status };
+	return { interactionId: interaction.id, userStatus: updated.userStatus };
 }
 
 function toInteraction(

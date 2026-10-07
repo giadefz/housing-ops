@@ -25,7 +25,7 @@ against a mismatched api version and tells the user to update.
 | `queue [--status status] [--limit n]` | flags | `{ offers: [OfferSummary], total }` — compact rows; default status `pending`, default limit 20 |
 | `offer get <id>` | id | `{ offer, verdicts }` — the offer carries versions, analyses, interactions |
 | `verdict set <id> --tier triage\|analyse --verdict screened\|shortlist\|reject\|hold --reason ... [--pros ...] [--cons ...] [--price-assessment ...] [--red-flags ...] [--recommendation ...] [--confidence 0-1]` | id + fields | `{ analysis_id }` |
-| `interact <id> --action viewed\|favorited\|rejected\|viewing-requested\|visited\|shared [--reason ...]` | id + fields | `{ interaction_id, status }` — resulting user state |
+| `interact <id> --action viewed\|favorited\|rejected\|viewing-requested\|visited\|shared [--reason ...]` | id + fields | `{ interaction_id, user_status }` — resulting user state |
 | `profile digest` | — | `{ profile, stats: { favorited: { count, offers }, rejected: { count, reasons }, priceBands: { favorited, overall }, topFeatures: { layouts, bedrooms, ber }, seen: { viewed, total } }, generatedAt }` |
 | `profile get [path]` | optional path | `{ path, value }` |
 | `profile set <path> <json-value>` | path + value | `{ path, value }` — validated write, fails loudly on bad input |
@@ -36,5 +36,5 @@ against a mismatched api version and tells the user to update.
 | `publish now [--event offer.passed]` | flags | `{ published: [{ publisher, event, offer_id, ok }] }` |
 
 `OfferSummary` is the queue entry: `id, provider, price, address_short,
-bedrooms, size_m2, type, status, fetched_at`. Full payloads come only from
-`offer get` — triage sessions stay cheap by default.
+bedrooms, size_m2, type, market_status, user_status, fetched_at`. Full payloads
+come only from `offer get` — triage sessions stay cheap by default.

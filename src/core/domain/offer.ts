@@ -32,7 +32,8 @@ export interface Offer {
 	postedAt?: string;
 	fetchedAt: string;
 	versions: OfferVersion[];
-	status: OfferStatus;
+	marketStatus: MarketStatus;
+	userStatus: UserStatus;
 	analyses: Analysis[];
 	interactions: Interaction[];
 }
@@ -55,8 +56,8 @@ export interface Price {
 	period: (typeof PRICE_PERIODS)[number];
 }
 
-/** Every status an offer can hold. Single source for the OfferStatus union. */
-export const OFFER_STATUSES = [
+/** Every market status an offer can hold. Single source for the MarketStatus union. */
+export const MARKET_STATUSES = [
 	"seen",
 	"passed",
 	"pending",
@@ -64,91 +65,79 @@ export const OFFER_STATUSES = [
 	"shortlisted",
 	"rejected",
 	"held",
-	"viewed",
-	"favorited",
-	"viewing_requested",
-	"visited",
-	"rejected_by_user",
 	"let",
 	"sold",
 	"gone",
 ] as const;
 
-/** Every status an offer can hold. */
-export type OfferStatus = (typeof OFFER_STATUSES)[number];
+/** Where the listing is in its market life. */
+export type MarketStatus = (typeof MARKET_STATUSES)[number];
 
-/** A user reaction that moves status. Sharing leaves status untouched. */
+/** Every user status an offer can hold. Single source for the UserStatus union. */
+export const USER_STATUSES = [
+	"none",
+	"viewed",
+	"favorited",
+	"viewing_requested",
+	"visited",
+	"rejected_by_user",
+] as const;
+
+/** How the user relates to the offer. Layers on top of the market status. */
+export type UserStatus = (typeof USER_STATUSES)[number];
+
+/** A user reaction. Sharing leaves the user status untouched. */
 export type UserAction = (typeof INTERACTION_ACTIONS)[number];
-
-/** True when a value is a known user action. */
-export function isUserAction(value: string): value is UserAction {
-	return (INTERACTION_ACTIONS as readonly string[]).includes(value);
-}
 
 /** A market outcome that closes the listing. */
 export type MarketOutcome = "let" | "sold" | "gone";
 
-/** Everything that can move an offer's status. */
-export type OfferEvent =
-	"clear" | "park" | AnalysisVerdict | UserAction | MarketOutcome;
+/** Everything that can move an offer's market status. */
+export type MarketEvent = "clear" | "park" | AnalysisVerdict | MarketOutcome;
 
-const SELF: unique symbol = Symbol("self");
+type MarketTransitions = Partial<Record<MarketEvent, MarketStatus>>;
 
-type TransitionTarget = OfferStatus | typeof SELF;
-type Transitions = Partial<Record<OfferEvent, TransitionTarget>>;
-
-/** Moves allowed from any open offer: judgments, reactions, and market outcomes. */
-const OPEN_TRANSITIONS: Transitions = {
+/** Moves allowed from any open market status: judgments and market outcomes. */
+const OPEN_MARKET_TRANSITIONS: MarketTransitions = {
 	screened: "screened",
 	shortlist: "shortlisted",
 	reject: "rejected",
 	hold: "held",
-	viewed: "viewed",
-	favorited: "favorited",
-	rejected: "rejected_by_user",
-	"viewing-requested": "viewing_requested",
-	visited: "visited",
-	shared: SELF,
 	let: "let",
 	sold: "sold",
 	gone: "gone",
 };
 
-/** The status machine. A closed offer (let/sold/gone) has no moves. */
-const TRANSITIONS: Record<OfferStatus, Transitions> = {
-	seen: { clear: "passed", park: "pending", ...OPEN_TRANSITIONS },
-	passed: OPEN_TRANSITIONS,
-	pending: OPEN_TRANSITIONS,
-	screened: OPEN_TRANSITIONS,
-	shortlisted: OPEN_TRANSITIONS,
-	rejected: OPEN_TRANSITIONS,
-	held: OPEN_TRANSITIONS,
-	viewed: OPEN_TRANSITIONS,
-	favorited: OPEN_TRANSITIONS,
-	viewing_requested: OPEN_TRANSITIONS,
-	visited: OPEN_TRANSITIONS,
-	rejected_by_user: OPEN_TRANSITIONS,
+/** The market machine. A closed offer (let/sold/gone) has no moves. */
+const MARKET_TRANSITIONS: Record<MarketStatus, MarketTransitions> = {
+	seen: { clear: "passed", park: "pending", ...OPEN_MARKET_TRANSITIONS },
+	passed: OPEN_MARKET_TRANSITIONS,
+	pending: OPEN_MARKET_TRANSITIONS,
+	screened: OPEN_MARKET_TRANSITIONS,
+	shortlisted: OPEN_MARKET_TRANSITIONS,
+	rejected: OPEN_MARKET_TRANSITIONS,
+	held: OPEN_MARKET_TRANSITIONS,
 	let: {},
 	sold: {},
 	gone: {},
 };
 
-/** Moves an offer along the status machine, or throws when the move is illegal. */
-export function transition(offer: Offer, event: OfferEvent): Offer {
-	const target = TRANSITIONS[offer.status][event];
+/** Moves an offer along the market machine, or throws when the move is illegal. */
+export function transitionMarket(offer: Offer, event: MarketEvent): Offer {
+	const target = MARKET_TRANSITIONS[offer.marketStatus][event];
 	if (target === undefined)
-		throw new InvalidTransitionError(offer.status, event);
-	return { ...offer, status: target === SELF ? offer.status : target };
+		throw new InvalidTransitionError(offer.marketStatus, event);
+	return { ...offer, marketStatus: target };
 }
 
 /** Moves a fresh sighting straight to the terminal queue. Only from seen. */
 export function clearFilters(offer: Offer): Offer {
-	return transition(offer, "clear");
+	return transitionMarket(offer, "clear");
 }
 
 /** Parks a fresh sighting for agent judgment. Only from seen. */
 export function parkForJudgment(offer: Offer): Offer {
-	return transition(offer, "park");
+	return transitionMarket(offer, "park");
 }
 
 /** Verdicts each tier may return. `screened` is triage-only, `shortlist` analysis-only. */
@@ -165,15 +154,37 @@ export function recordJudgment(
 ): Offer {
 	if (!TIER_VERDICTS[tier].includes(verdict))
 		throw new InvalidVerdictError(tier, verdict);
-	return transition(offer, verdict);
+	return transitionMarket(offer, verdict);
 }
 
-/** Records a user reaction. Sharing leaves the status untouched. */
+const SELF: unique symbol = Symbol("self");
+
+/** The user status each reaction sets; sharing leaves it untouched. */
+const USER_ACTION_STATUS: Record<UserAction, UserStatus | typeof SELF> = {
+	viewed: "viewed",
+	favorited: "favorited",
+	rejected: "rejected_by_user",
+	"viewing-requested": "viewing_requested",
+	visited: "visited",
+	shared: SELF,
+};
+
+/** Records a user reaction. Closed listings accept no reactions. */
 export function recordUserAction(offer: Offer, action: UserAction): Offer {
-	return transition(offer, action);
+	if (isMarketClosed(offer.marketStatus))
+		throw new InvalidTransitionError(offer.marketStatus, action);
+	const target = USER_ACTION_STATUS[action];
+	return {
+		...offer,
+		userStatus: target === SELF ? offer.userStatus : target,
+	};
+}
+
+function isMarketClosed(status: MarketStatus): boolean {
+	return status === "let" || status === "sold" || status === "gone";
 }
 
 /** Records a market outcome. Closes the listing; closed is final. */
 export function recordMarketEvent(offer: Offer, outcome: MarketOutcome): Offer {
-	return transition(offer, outcome);
+	return transitionMarket(offer, outcome);
 }
