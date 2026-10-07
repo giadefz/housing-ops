@@ -98,15 +98,12 @@ describe("queue", () => {
 	it("lists a page through the service with a total", async () => {
 		const { store } = testStore();
 		await seed(store);
-		const page = await listQueue({ store, status: "seen", limit: 10 });
+		const page = await listQueue({
+			store,
+			input: { status: "seen", limit: 10 },
+		});
 		expect(page.offers).toHaveLength(1);
 		expect(page.total).toBe(1);
-	});
-	it("rejects an unknown status", async () => {
-		const { store } = testStore();
-		await expect(
-			listQueue({ store, status: "bogus", limit: 10 }),
-		).rejects.toThrow(/unknown offer status/);
 	});
 });
 

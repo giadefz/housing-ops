@@ -4,6 +4,7 @@ import {
 	ANALYSIS_VERDICTS,
 	INTERACTION_ACTIONS,
 } from "../domain/analysis.js";
+import { OFFER_STATUSES } from "../domain/offer.js";
 
 /** A verdict set request: a tier, a verdict, and its evidence. */
 export const VerdictInputSchema = z.object({
@@ -29,3 +30,29 @@ export const InteractionInputSchema = z.object({
 
 /** The parsed interact request. */
 export type InteractionInput = z.infer<typeof InteractionInputSchema>;
+
+/** A queue request: which status, and how many rows. */
+export const QueueInputSchema = z.object({
+	status: z.enum(OFFER_STATUSES).default("pending"),
+	limit: z.number().int().positive().default(20),
+});
+
+/** The parsed queue request. */
+export type QueueInput = z.infer<typeof QueueInputSchema>;
+
+/** A profile get request: an optional dotted path. */
+export const ProfileGetSchema = z.object({
+	path: z.string().min(1).optional(),
+});
+
+/** The parsed profile get request. */
+export type ProfileGetInput = z.infer<typeof ProfileGetSchema>;
+
+/** A profile set request: a dotted path and its JSON value. */
+export const ProfileSetSchema = z.object({
+	path: z.string().min(1),
+	value: z.unknown(),
+});
+
+/** The parsed profile set request. */
+export type ProfileSetInput = z.infer<typeof ProfileSetSchema>;

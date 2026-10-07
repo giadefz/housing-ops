@@ -27,8 +27,14 @@ export {
 } from "./providers.js";
 export {
 	InteractionInputSchema,
+	ProfileGetSchema,
+	ProfileSetSchema,
+	QueueInputSchema,
 	VerdictInputSchema,
 	type InteractionInput,
+	type ProfileGetInput,
+	type ProfileSetInput,
+	type QueueInput,
 	type VerdictInput,
 } from "./requests.js";
 

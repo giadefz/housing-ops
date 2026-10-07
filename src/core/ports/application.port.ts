@@ -2,7 +2,13 @@ import type { Listing } from "../domain/listing.js";
 import type { Offer, OfferStatus } from "../domain/offer.js";
 import type { Verdict } from "../domain/verdict.js";
 import type { Profile } from "../schemas/profile.js";
-import type { InteractionInput, VerdictInput } from "../schemas/requests.js";
+import type {
+	InteractionInput,
+	ProfileGetInput,
+	ProfileSetInput,
+	QueueInput,
+	VerdictInput,
+} from "../schemas/requests.js";
 import type { FeatureCount, OfferSummary } from "./store.port.js";
 
 /** Core and api versions, for compatibility checks between core and interfaces. */
@@ -141,10 +147,10 @@ export interface ApplicationPort {
 	checkFilter(id: string): Promise<FilterCheckResult>;
 	testProvider(id: string): Promise<ProviderTestResult>;
 	scan(providerId?: string): Promise<ScanResult>;
-	listQueue(status: string, limit: number): Promise<QueueResult>;
+	listQueue(input: QueueInput): Promise<QueueResult>;
 	setVerdict(id: string, input: VerdictInput): Promise<VerdictResult>;
 	interact(id: string, input: InteractionInput): Promise<InteractionResult>;
-	getProfile(path?: string): ProfileValueResult;
-	setProfile(path: string, value: unknown): Promise<ProfileSetResult>;
+	getProfile(input: ProfileGetInput): ProfileValueResult;
+	setProfile(input: ProfileSetInput): ProfileSetResult;
 	getDigest(): Promise<DigestResult>;
 }

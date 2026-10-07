@@ -77,11 +77,6 @@ export const OFFER_STATUSES = [
 /** Every status an offer can hold. */
 export type OfferStatus = (typeof OFFER_STATUSES)[number];
 
-/** True when a value is a known offer status. */
-export function isOfferStatus(value: string): value is OfferStatus {
-	return (OFFER_STATUSES as readonly string[]).includes(value);
-}
-
 /** A user reaction that moves status. Sharing leaves status untouched. */
 export type UserAction = (typeof INTERACTION_ACTIONS)[number];
 

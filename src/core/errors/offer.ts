@@ -16,14 +16,6 @@ export class InvalidVerdictError extends AppError {
 	}
 }
 
-/** Thrown when a queue status filter is not a known offer status. */
-export class UnknownStatusError extends AppError {
-	constructor(status: string) {
-		super(`unknown offer status: ${status}`);
-		this.name = "UnknownStatusError";
-	}
-}
-
 /** Thrown when an offer is requested but not stored. */
 export class OfferNotFoundError extends AppError {
 	constructor(id: string) {

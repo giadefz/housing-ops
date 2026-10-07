@@ -84,9 +84,9 @@ export async function createApplication(
 		validateWorkspace: () => validateWorkspace(workspace),
 		getOffer: (id) =>
 			withStore(storeFactory, root, (store) => getOffer(store, id)),
-		listQueue: (status, limit) =>
+		listQueue: (input) =>
 			withStore(storeFactory, root, (store) =>
-				listQueue({ store, status, limit }),
+				listQueue({ store, input }),
 			),
 		setVerdict: (id, input) =>
 			withStore(storeFactory, root, (store) =>
@@ -96,18 +96,21 @@ export async function createApplication(
 			withStore(storeFactory, root, (store) =>
 				interact({ store, clock, id, input }),
 			),
-		getProfile: (path) => ({
-			path: path ?? null,
-			value: readProfileValue(parseProfile(profileText), path),
+		getProfile: (input) => ({
+			path: input.path ?? null,
+			value: readProfileValue(parseProfile(profileText), input.path),
 		}),
-		setProfile: async (path, value) => {
+		setProfile: (input) => {
 			const updated = setProfileValue(
 				parseProfile(profileText),
-				path,
-				value,
+				input.path,
+				input.value,
 			);
 			writeProfile(root, updated);
-			return { path, value: readProfileValue(updated, path) };
+			return {
+				path: input.path,
+				value: readProfileValue(updated, input.path),
+			};
 		},
 		getDigest: () =>
 			withStore(storeFactory, root, (store) =>
