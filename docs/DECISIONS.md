@@ -48,7 +48,8 @@ Open risks to grill: scraping ToS per country; deduping the same listing across 
 - [x] Phase 2 slice 2c: `provider list` + composition/entry split + injected dependencies (D43–D44, 80 tests), committed as `3a5d49d`
 - [x] Phase 2 slice 2d: `scan` pipeline (fetch→normalize→store, per-record dead-letter; D45) + change-only versions (83 tests), committed as `b259c46` — **Phase 2 complete**
 - [x] Phase 3 — filters: contract + ordered runner, `pipeline.yml`, `filter list`/`check`, country gating, local discovery (approved `filters.local`), built-ins budget/bedrooms/location/type/size (102 tests; type/size uncommitted)
-- [ ] Next: Phase 4 — dedup + version history (recheck/delisting cut per D46–D48). Plan: `docs/plans/phase-4.md`
+- [x] Phase 4 — dedup + version history (recheck/delisting cut per D46–D48; 107 tests) — **Phase 4 complete**
+- [ ] Next: Phase 5 — queue + prefs (`queue`, `verdict set`, `interact`, `prefs`)
 - [ ] Round 3+: scheduling, security of user-authored code, testing/CI, license
 
 ## Decisions

@@ -130,11 +130,12 @@ Phases run in order; each phase's criterion is the gate to the next.
   built-ins.
   Done when: a full `scan` runs fetch→store with per-filter verdicts
   recorded, and every built-in passes unit tests against fixture offers.
-- **Phase 4 — dedup + statuses + recheck.** Cross-provider and history
-  dedup; relist emits `offer.updated`; status transitions; 48h recheck;
-  delisting flips to `gone`. Plan: `docs/plans/phase-4.md`.
-  Done when: re-running `scan` creates no duplicates, a delisted listing
-  flips to `gone`, and a price change emits `offer.updated`.
+- **Phase 4 — dedup + version history.** Cross-provider and history dedup;
+  a changed relist appends a version. Delisting is proven, not inferred (D46);
+  no event surface (D47). Plan: `docs/plans/phase-4.md`.
+  Done when: re-running `scan` creates no duplicate dwellings or offers, the
+  same dwelling on two providers is one dwelling/two offers, and a price change
+  appends a version.
 - **Phase 5 — queue + prefs.** `queue`, `verdict set`, `interact`, `prefs`
   commands.
   Done when: triage → analyse → react runs entirely through commands with

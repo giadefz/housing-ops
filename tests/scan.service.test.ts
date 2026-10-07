@@ -199,6 +199,14 @@ describe("scan", () => {
 		const offer = await findOfferByListing(database, "fake", "a");
 		expect(offer?.versions).toHaveLength(2);
 		expect(offer?.price.amount).toBe(1800);
+		const offers: unknown[] = database
+			.prepare("SELECT id FROM offers")
+			.all();
+		const versions = database
+			.prepare("SELECT COUNT(*) AS count FROM offer_versions")
+			.get() as { count: number };
+		expect(offers).toHaveLength(1);
+		expect(versions.count).toBe(2);
 	});
 
 	it("resolves one dwelling for the same address from two providers", async () => {
