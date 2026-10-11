@@ -1,6 +1,11 @@
 import { storeFactory } from "./adapters/secondary/store-factory.js";
 import { systemClock } from "./adapters/secondary/system-clock.js";
-import { readWorkspace, writeProfile } from "./adapters/secondary/workspace.js";
+import {
+	readWorkspace,
+	writeProfile,
+	writeWorkspace,
+} from "./adapters/secondary/workspace.js";
+import { initDatabase } from "./adapters/secondary/storage/sqlite/init.js";
 import { createApplication } from "./composition.js";
 import { irelandPack } from "./countries/ie/pack.js";
 import type { ApplicationPort } from "./core/ports/application.port.js";
@@ -13,6 +18,8 @@ export function createDefaultApplication(
 		storeFactory,
 		readWorkspace,
 		writeProfile,
+		writeWorkspace,
+		initDatabase,
 		clock: systemClock,
 		pack: irelandPack,
 		warn: (message) =>

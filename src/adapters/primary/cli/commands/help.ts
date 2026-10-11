@@ -5,7 +5,7 @@ const commands = [
 	{ name: "validate", status: "implemented" },
 	{ name: "offer get <id>", status: "implemented" },
 	{ name: "scan [--provider id]", status: "implemented" },
-	{ name: "setup", status: "planned (Phase 7)" },
+	{ name: "setup", status: "implemented" },
 	{ name: "queue", status: "implemented" },
 	{ name: "verdict set", status: "implemented" },
 	{ name: "interact", status: "implemented" },

@@ -11,12 +11,14 @@ import { providerCommands } from "./commands/provider.js";
 import { publishCommands } from "./commands/publish.js";
 import { queueCommands } from "./commands/queue.js";
 import { scanCommands } from "./commands/scan.js";
+import { setupCommands } from "./commands/setup.js";
 import { systemCommands } from "./commands/system.js";
 import { verdictCommands } from "./commands/verdict.js";
 import type { CommandHandler } from "./commands/types.js";
 
 const commandHandlers: Record<string, CommandHandler> = {
 	...systemCommands,
+	...setupCommands,
 	...offerCommands,
 	...providerCommands,
 	...filterCommands,

@@ -25,3 +25,12 @@ function loadYaml(text: string): unknown {
 		throw new ConfigError(`profile.yml: ${errorMessage(error)}`, error);
 	}
 }
+
+/** Parses profile.yml, returning null when it is missing or invalid. */
+export function tryParseProfile(profileText: string | null): Profile | null {
+	try {
+		return parseProfile(profileText);
+	} catch {
+		return null;
+	}
+}

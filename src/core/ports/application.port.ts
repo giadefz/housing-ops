@@ -3,6 +3,7 @@ import type { Offer, UserStatus } from "../domain/offer.js";
 import type { PipelineEvent } from "../domain/events.js";
 import type { Verdict } from "../domain/verdict.js";
 import type { Profile } from "../schemas/profile.js";
+import type { ConfigFile, SetupInput } from "../schemas/index.js";
 import type {
 	InteractionInput,
 	ProfileGetInput,
@@ -145,10 +146,17 @@ export interface FilterCheckResult {
 	examples: FilterCheckExample[];
 }
 
+/** The result of setting up a workspace: the files written and the database path. */
+export interface SetupResult {
+	files: ConfigFile[];
+	database: string;
+}
+
 /** The use-case surface every inbound (primary) adapter drives. Inbound adapters depend on this alone. */
 export interface ApplicationPort {
 	getVersion(): VersionInfo;
 	validateWorkspace(): ValidationReport;
+	setup(input: SetupInput, force: boolean): SetupResult;
 	getOffer(id: string): Promise<OfferDetail>;
 	listProviders(): ProviderSummary[];
 	listFilters(): FilterSummary[];

@@ -4,7 +4,7 @@ import {
 	listFilters,
 } from "./adapters/secondary/filters/registry.js";
 import { profileCoverageWarnings } from "./adapters/secondary/filters/coverage.js";
-import { parseProfile } from "./adapters/secondary/profile.js";
+import { parseProfile, tryParseProfile } from "./adapters/secondary/profile.js";
 import {
 	buildProviders,
 	listProviderSummaries,
@@ -39,6 +39,10 @@ import {
 import { listQueue } from "./core/services/queue.service.js";
 import { publishNow } from "./core/services/publish.service.js";
 import { scan, type ScanDependencies } from "./core/services/scan.service.js";
+import {
+	setupWorkspace,
+	type WorkspacePlan,
+} from "./core/services/setup.service.js";
 import { setVerdict } from "./core/services/verdict.service.js";
 import {
 	validateWorkspace,
@@ -55,6 +59,8 @@ export interface ApplicationDependencies {
 	storeFactory: StoreFactory;
 	readWorkspace: (root: string) => WorkspaceInput;
 	writeProfile: (root: string, profile: Profile) => void;
+	writeWorkspace: (root: string, plan: WorkspacePlan, force: boolean) => void;
+	initDatabase: (root: string) => string;
 	clock: ClockPort;
 	pack: CountryPack;
 	warn: (message: string) => void;
@@ -65,8 +71,16 @@ export async function createApplication(
 	root: string,
 	dependencies: ApplicationDependencies,
 ): Promise<ApplicationPort> {
-	const { storeFactory, readWorkspace, writeProfile, clock, pack, warn } =
-		dependencies;
+	const {
+		storeFactory,
+		readWorkspace,
+		writeProfile,
+		writeWorkspace,
+		initDatabase,
+		clock,
+		pack,
+		warn,
+	} = dependencies;
 	const workspace = readWorkspace(root);
 	const providersText = workspace.configTexts["providers.yml"];
 	const pipelineText = workspace.configTexts["pipeline.yml"];
@@ -79,6 +93,11 @@ export async function createApplication(
 		root,
 		workspace.configTexts["extensions.yml"],
 	);
+	const setupInputs = {
+		write: (plan: WorkspacePlan, force: boolean) =>
+			writeWorkspace(root, plan, force),
+		initDatabase: () => initDatabase(root),
+	};
 	warnOnProfileGaps({
 		profileText,
 		pipelineText,
@@ -89,6 +108,8 @@ export async function createApplication(
 	return {
 		getVersion,
 		validateWorkspace: () => validateWorkspace(workspace),
+		setup: (input, force) =>
+			setupWorkspace({ input, force, ...setupInputs }),
 		getOffer: (id) =>
 			withStore(storeFactory, root, (store) => getOffer(store, id)),
 		listQueue: (input) =>
@@ -169,15 +190,14 @@ interface ProfileGapInput {
 
 /** Reports profile fields and enabled filters that do not line up, at boot. */
 function warnOnProfileGaps(input: ProfileGapInput): void {
+	const profile = tryParseProfile(input.profileText);
+	if (profile === null) return;
 	const stages = buildFilterStages(
 		input.pipelineText,
 		input.country,
 		input.filters,
 	);
-	const warnings = profileCoverageWarnings(
-		stages,
-		parseProfile(input.profileText),
-	);
+	const warnings = profileCoverageWarnings(stages, profile);
 	for (const warning of warnings) input.warn(warning);
 }
 

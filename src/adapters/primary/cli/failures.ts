@@ -19,6 +19,7 @@ import {
 	ProfilePathError,
 } from "../../../core/errors/profile.js";
 import { StoreNotInitializedError } from "../../../core/errors/storage.js";
+import { WorkspaceExistsError } from "../../../core/errors/setup.js";
 import type { Failure } from "./envelope.js";
 
 interface FailureSpec {
@@ -72,6 +73,13 @@ const failureSpecs = new Map<AppErrorClass, FailureSpec>([
 	[
 		StoreNotInitializedError,
 		{ code: "WORKSPACE_NOT_INITIALIZED", hint: "run housing-ops setup" },
+	],
+	[
+		WorkspaceExistsError,
+		{
+			code: "WORKSPACE_EXISTS",
+			hint: "pass --force to overwrite, or run housing-ops validate",
+		},
 	],
 ]);
 

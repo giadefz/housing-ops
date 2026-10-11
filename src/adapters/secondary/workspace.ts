@@ -9,6 +9,7 @@ import {
 } from "../../core/schemas/index.js";
 import type { ConfigFile } from "../../core/schemas/index.js";
 import type { Profile } from "../../core/schemas/profile.js";
+import { WorkspaceExistsError } from "../../core/errors/setup.js";
 import type { WorkspacePlan } from "../../core/services/setup.service.js";
 import type { WorkspaceInput } from "../../core/services/validate.service.js";
 import { readSchemaVersion, SCHEMA_VERSION } from "./storage/sqlite/migrate.js";
@@ -44,8 +45,15 @@ export function writeProfile(root: string, profile: Profile): void {
 	);
 }
 
-/** Writes the five config documents under `config/`, creating the directory if needed. */
-export function writeWorkspace(root: string, plan: WorkspacePlan): void {
+/** Writes the five config documents under `config/`. Refuses an existing profile unless forced. */
+export function writeWorkspace(
+	root: string,
+	plan: WorkspacePlan,
+	force = false,
+): void {
+	if (!force && fs.existsSync(configPath(root, "profile.yml"))) {
+		throw new WorkspaceExistsError(root);
+	}
 	fs.mkdirSync(path.join(root, "config"), { recursive: true });
 	for (const file of CONFIG_FILES) {
 		fs.writeFileSync(configPath(root, file), yaml.dump(plan[file]), "utf8");
@@ -53,8 +61,11 @@ export function writeWorkspace(root: string, plan: WorkspacePlan): void {
 }
 
 export function databasePath(root: string): string {
-	return path.join(root, "data", "housing.db");
+	return path.join(root, DATABASE_FILE);
 }
+
+/** The workspace database, relative to the root. */
+export const DATABASE_FILE = "data/housing.db";
 
 function readConfigs(root: string): Record<ConfigFile, string | null> {
 	return {
