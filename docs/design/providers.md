@@ -62,6 +62,15 @@ implementations. A provider (its command plus config) lives in your workspace
 (`providers.local/`, `config/providers.yml`) and is yours to write and
 maintain; scrapers break often. The `add-provider` flow helps you create one.
 
+## Trust: approvals and hash-pinning
+
+Code you add in `*.local/` runs on your machine, so the core makes you approve it
+explicitly and then pins it. An approval in `config/extensions.yml` records the
+module's `path` and a `sha256` of its contents. Nothing in a `.local/` directory
+runs until it appears there, and if an approved file changes, its hash no longer
+matches — the core refuses to load it and tells you the exact re-approval
+command. You stay the only actor who can put code into the pipeline.
+
 ## Adapter kinds
 
 **Process adapter (primary).** Runs an external program and reads its **stdout**

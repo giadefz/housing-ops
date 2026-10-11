@@ -8,6 +8,8 @@ config/*.yml
 # personal harness setup — not part of the product
 .agents/
 skills-lock.json
+# internal design/dev docs — kept locally, never shipped
+.internal/
 # local experiments — never committed
 .lab/
 *.local/*

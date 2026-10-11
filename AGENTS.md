@@ -63,9 +63,8 @@ to end rather than improvising.
 Providers and publishers are user-side: the repo ships the machinery, not the
 implementations.
 
-## Working on housing-ops itself
+## Maintaining housing-ops itself
 
-- **Any task** — `docs/DESIGN.md`: the design index (shape, vocabulary, build
-  order, and a component map to every contract).
-- **Every decision** — `docs/DECISIONS.md`.
-- **Changing code** — `docs/HOUSE-RULES.md`: naming, formatting, tests.
+Design work on the core is separate from using it. The design log, house rules,
+and phase plans are maintainer material kept in the gitignored `.internal/`
+folder — they are intentionally not part of this repo.

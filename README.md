@@ -3,13 +3,15 @@
 **Your own housing-search engine — an LLM-driven helper for renting or buying a home.**
 
 You open this repo in your AI assistant (opencode, Claude Code, …) and talk to it like a colleague:
-*"find me a 2-bed in Dublin under €2,200 with a garden."*
-It configures itself, scans property portals on a schedule, filters every listing
-through a pipeline you control, and hands you a shortlist —
+*"find me a 2-bed in Dublin under €2,500 with a garden."*
+It configures itself, scans property portals, filters
+every listing through a pipeline you control, and hands you a shortlist —
 learning what you like from every reaction you give it.
 
-> **Status:** housing-ops is in design. This README describes the system we're
-> building; the implementation follows the design in `docs/DECISIONS.md`.
+> **Status:** v1. The deterministic core — providers, filters, storage, the
+> judgement loop, and publishers — is built and tested. It ships the machinery,
+> **not the portals**: you add a provider for your portal before the first scan
+> returns anything. See `AGENTS.md` and `docs/design/`.
 
 ## The problem
 
@@ -25,18 +27,21 @@ what you like.
 ## How it works
 
 1. **Providers fetch listings.** Pluggable adapters pull from property portals —
-   Daft, MyHome, Rent.ie in Ireland, whatever you add for your country. A
+   Daft, MyHome, Rent.ie in Ireland, whichever you wire for your country. A
    provider can be an external tool (e.g. a Python scraper), a small script, or
    a plain HTTP feed. Anything that emits our listing JSON can be a provider.
+   The repo ships the contract and the adapters, not the providers — you add
+   one with the `add-provider` flow.
 2. **A filter pipeline narrows them down.** Location, budget, layout, bedrooms,
-   size, floor, age, BER rating, must-haves, red flags — ordered, configurable,
-   and deliberately **loose**. We don't try to be clever here; we try not to
-   miss anything.
+   size — ordered, configurable, and deliberately **loose**. We don't try to be
+   clever here; we try not to miss anything. Country-specific facts (BER, in
+   Ireland) and any rule of your own (floor, age, must-haves, red flags) arrive
+   as local filters you author by *describing* them to the agent.
 3. **Everything is stored.** Every listing, whether it passed or failed, lands
    in a small local database with the verdict attached. Rejections are data:
    they're how the system learns.
 4. **The agent reads the survivors.** In a session with your AI assistant, it
-   triages the queue (cheap pass: keep / reject / hold), then analyses what it
+   triages the queue (cheap pass: screened / reject / hold), then analyses what it
    kept in depth — against your profile, against comparable listings it has
    seen before, checking for red flags — and records a structured verdict.
 5. **You react, it learns.** Viewed, favorited, rejected (*with a reason*),
@@ -73,9 +78,10 @@ half.
   is not.
 - **Composable by design.** Four extension points, each a drop-in module:
   **providers** (where listings come from), **filters** (how they're judged),
-  **publishers** (where matches go — a webhook today, Telegram later),
-  **storage** (SQLite by default; plug in anything, including cloud databases).
-  You can even author new filters by *describing* them to the agent.
+  **publishers** (where matches go — any command that reads the event envelope,
+  Telegram or a script), **storage** (SQLite by default; plug in anything,
+  including cloud databases). You can even author new filters by *describing*
+  them to the agent.
 - **History-preserving.** The database keeps every listing considered and every
   decision made about it. That history is what lets the agent understand your
   taste instead of re-asking you every week.
@@ -86,29 +92,35 @@ kept firmly outside the hexagon.
 ## Inspired by career-ops
 
 The idea owes a debt to
-[career-ops](https://github.com/career-ops-hq/career-ops), a job-hunting
-co-pilot with the same spirit: personal, local-first, agent-driven search.
-We keep its best instincts — a zero-cost deterministic scan tier, a provider
-module contract, human-in-the-loop guarantees — and fix what made it hard to
-customize: instead of prompt files plus loose scripts with files as the
-database, housing-ops is a real typed application with a database as the
-source of truth and the AI as a replaceable interface.
+[career-ops](https://github.com/career-ops-hq/career-ops).
 
 ## Quickstart
 
 ```bash
 git clone <this-repo> housing-ops
 cd housing-ops
-npm install
-housing-ops setup        # or: open the repo in your assistant and say "set me up"
+npm ci
+npm run build
+npm link           # put `housing-ops` on your PATH (or use: npm run housing-ops -- <cmd>)
 ```
 
-Setup is a conversation: country (Ireland by default), rent or buy, budget,
-areas, must-haves, deal-breakers, which providers to enable. It writes your
-config and initializes the database. Then:
+Open the repo in your assistant and say *"set me up"* — or run
+`housing-ops setup`. Setup is a conversation: country (Ireland by default), rent
+or buy, budget, areas, must-haves, deal-breakers, the judgement gate. It writes
+your five config files and initialises the database.
+
+Then **add a provider** — housing-ops ships none, by design. Tell your assistant
+*"write me a Daft provider"* and it follows `skills/write-provider/`: it writes a
+command that emits listing JSON, adds a `providers.yml` entry, and tests it.
 
 ```bash
-housing-ops scan         # fetch → filter → store (deterministic, zero AI cost)
+housing-ops provider test daft   # a capped sample, validated
+```
+
+Now you can scan, and ask:
+
+```bash
+housing-ops scan                 # fetch → filter → store (deterministic, zero AI cost)
 ```
 
 …and in your assistant: *"what's new?"* — it triages the queue, analyses the
@@ -118,21 +130,22 @@ keepers, and shows you the shortlist.
 
 ```text
 src/
-  main.ts                # composition root (from Phase 1: first real wiring)
+  composition.ts         # the composition root: wires adapters into ApplicationPort
+  defaults.ts            # the bundled adapters
   core/
-    domain/              # dwelling, offer, listing, profile… — pure, zod only
-    ports/               # provider, filter, store, publisher, clock contracts
-    services/            # use cases: validate, scan, verdicts, profile…
+    domain/              # dwelling, offer, listing, country-pack — pure, zod only
+    ports/               # provider, filter, store, publisher, event bus, clock
+    services/            # use cases: validate, setup, scan, queue, verdict, publish…
+    schemas/             # the five config files + the request contracts
+    errors/              # typed errors the wire layer maps to failure codes
   adapters/
-    primary/cli/         # argv, dispatch, envelope printing
-    secondary/           # file reading, command runner, registries
-  config-schema.ts       # our own config files' contracts
-  errors.ts
-providers/ filters/ publishers/ storage/ countries/   # droppable adapters
-providers.local/ filters.local/ …                     # yours (approved + hash-checked)
-config/                  # profile.yml, pipeline.yml, providers.yml, extensions.yml
+    primary/cli/         # argv, dispatch, commands/, envelope printing (entry point)
+    secondary/           # workspace, storage/sqlite, providers, filters, publishers
+  countries/ie/          # the Ireland pack
+providers.local/  filters.local/   # yours (approved + hash-pinned in extensions.yml)
+config/                  # profile, pipeline, providers, publishers, extensions (.yml)
 data/                    # housing.db (gitignored) — your history lives here
-docs/                    # decisions, ADRs, design notes
+docs/design/             # the contracts the agent reads
 tests/
 ```
 
@@ -143,8 +156,9 @@ tests/
   core pins and verifies it from then on.
 - **Add a filter:** describe it to your assistant — it writes the module,
   dry-runs it against listings you already have, and asks for approval.
-- **Add a publisher:** implement `publish(event, payload)`; subscribe to
-  `offer.passed`, `offer.updated` (e.g. price drops), or `offer.judged`.
+- **Add a publisher:** point `publishers.yml` at any command that reads the
+  event envelope on stdin; subscribe to `offer.passed`, `offer.screened`,
+  `offer.shortlisted`, `offer.closed`, or `offer.updated` (price drops).
 - **Swap storage:** implement the store port; SQLite stays the default.
 
 User-authored extensions are approved explicitly and hash-pinned — if a pinned
@@ -152,27 +166,20 @@ file changes, the core refuses to load it until you re-approve.
 
 ## Defaults: Ireland
 
-Out of the box: Daft + MyHome + Rent.ie, euro pricing, Eircode-aware
-addresses, BER-rating filter. Portals change their sites and their terms, so
-bundled providers are thin, paced, and replaceable — the machinery is the
-product.
+Out of the box: Ireland — euro pricing, Eircode-aware addresses, and a
+BER-rating filter, with the architecture ready for any country. Portals are
+user-side: Daft, MyHome, and Rent.ie are wired through the add-provider flow,
+not bundled. Portals change their sites and their terms, so a shipped scraper
+would break and age; the machinery is the product.
 
 ## Scraping & fair use
 
-housing-ops is a personal-use tool. Bundled providers are rate-limited by
-default, never circumvent bot protection (if a portal walls itself off, the
-provider reports degraded health instead), and you are responsible for
-complying with each portal's terms. If the terms don't allow it, don't point
-it at them.
-
-## Roadmap
-
-- v1: deterministic backend + harness interface (this README's core)
-- Later: our own frontend over the same command surface, with its own AI
-  integration — same experience, no third-party assistant required
-- Later: richer publishers (Telegram, …), more countries' default providers
+housing-ops is a personal-use tool. The core paces the providers you wire and
+never circumvents bot protection (if a portal walls itself off, the provider
+reports degraded health instead), and you are responsible for complying with
+each portal's terms. If the terms don't allow it, don't point it at them.
 
 ## License
 
-MIT. Your data (`data/`, `config/`) is yours and never leaves your machine
-unless you attach a publisher that sends it somewhere.
+MIT — see [LICENSE](LICENSE). Your data (`data/`, `config/`) is yours and never
+leaves your machine unless you attach a publisher that sends it somewhere.
