@@ -1,5 +1,8 @@
 import { spawn } from "node:child_process";
-import type { PipelineEvent } from "../../../core/domain/events.js";
+import type {
+	PipelineEvent,
+	PipelinePayload,
+} from "../../../core/domain/events.js";
 import { PublisherError } from "../../../core/errors/publisher.js";
 import type { PublisherPort } from "../../../core/ports/publisher.port.js";
 import type { PublisherEntry } from "../../../core/schemas/index.js";
@@ -7,7 +10,7 @@ import type { PublisherEntry } from "../../../core/schemas/index.js";
 /** The document handed to a publisher command on stdin. */
 export interface EventEnvelope {
 	event: PipelineEvent;
-	payload: unknown;
+	payload: PipelinePayload;
 }
 
 /** Runs an external process as a publisher: the event envelope goes to its stdin. */

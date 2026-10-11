@@ -49,6 +49,8 @@ export interface RunStats {
 	failed: number;
 	skipped: number;
 	stored: number;
+	published: number;
+	publishFailed: number;
 }
 
 /** A listing that failed normalization, kept for inspection. */

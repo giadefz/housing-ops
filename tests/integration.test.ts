@@ -118,7 +118,13 @@ describe("end to end", () => {
 			]);
 
 			const scan = await app.scan();
-			expect(scan).toEqual({ fetched: 3, stored: 2, deadLettered: 1 });
+			expect(scan).toEqual({
+				fetched: 3,
+				stored: 2,
+				deadLettered: 1,
+				published: 0,
+				publishFailed: 0,
+			});
 
 			expect(
 				(await findOfferByListing(database, "fake", "cheap"))

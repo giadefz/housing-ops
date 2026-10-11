@@ -162,6 +162,8 @@ describe("runs", () => {
 			failed: 5,
 			skipped: 0,
 			stored: 9,
+			published: 3,
+			publishFailed: 1,
 		});
 		const row = database
 			.prepare("SELECT finished_at, stats FROM runs WHERE run_id = ?")
@@ -174,6 +176,8 @@ describe("runs", () => {
 				failed: 5,
 				skipped: 0,
 				stored: 9,
+				published: 3,
+				publishFailed: 1,
 			}),
 		});
 	});

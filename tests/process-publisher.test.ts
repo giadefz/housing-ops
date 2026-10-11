@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { createProcessPublisher } from "../src/adapters/secondary/publishers/process-publisher.js";
+import type { Offer } from "../src/core/domain/offer.js";
 import type { PublisherEntry } from "../src/core/schemas/index.js";
 
 let cleanups: Array<() => void> = [];
@@ -16,6 +17,28 @@ function tmpFile(): string {
 	cleanups.push(() => fs.rmSync(directory, { recursive: true, force: true }));
 	return path.join(directory, "stdin.json");
 }
+
+function offerFixture(): Offer {
+	return {
+		id: "o1",
+		dwellingId: "dw-1",
+		provider: "daft",
+		listingId: "abc",
+		url: "https://example.invalid/abc",
+		market: "rent",
+		price: { amount: 2200, currency: "EUR", period: "month" },
+		images: [],
+		description: "Bright apartment",
+		fetchedAt: "2026-10-04T00:00:00.000Z",
+		versions: [],
+		marketStatus: "passed",
+		userStatus: "none",
+		analyses: [],
+		interactions: [],
+	};
+}
+
+const payload = { offer: offerFixture() };
 
 function entry(overrides: Partial<PublisherEntry> = {}): PublisherEntry {
 	return {
@@ -39,12 +62,9 @@ describe("createProcessPublisher", () => {
 		const publisher = createProcessPublisher(
 			entry({ args: ["-e", writeStdin], env: { OUT: out } }),
 		);
-		await publisher.publish("offer.passed", { offer: { id: "o1" } });
+		await publisher.publish("offer.passed", payload);
 		const written = JSON.parse(fs.readFileSync(out, "utf8")) as unknown;
-		expect(written).toEqual({
-			event: "offer.passed",
-			payload: { offer: { id: "o1" } },
-		});
+		expect(written).toEqual({ event: "offer.passed", payload });
 		expect(publisher.subscriptions).toEqual(["offer.passed"]);
 	});
 
@@ -52,8 +72,8 @@ describe("createProcessPublisher", () => {
 		const publisher = createProcessPublisher(
 			entry({ args: ["-e", "process.exit(3)"], env: {} }),
 		);
-		await expect(publisher.publish("offer.passed", {})).rejects.toThrow(
-			/code 3/,
-		);
+		await expect(
+			publisher.publish("offer.passed", payload),
+		).rejects.toThrow(/code 3/);
 	});
 });

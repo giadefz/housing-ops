@@ -9,6 +9,8 @@ import {
 	buildProviders,
 	listProviderSummaries,
 } from "./adapters/secondary/providers/registry.js";
+import { buildPublishers } from "./adapters/secondary/publishers/registry.js";
+import { createEventBus } from "./adapters/secondary/publishers/event-bus.js";
 import type { CountryPack } from "./core/domain/country-pack.js";
 import { FilterNotFoundError } from "./core/errors/filter.js";
 import { ProviderNotFoundError } from "./core/errors/provider.js";
@@ -18,6 +20,7 @@ import type {
 	ScanResult,
 } from "./core/ports/application.port.js";
 import type { ClockPort } from "./core/ports/clock.port.js";
+import type { EventPort } from "./core/ports/event.port.js";
 import type { FilterPort } from "./core/ports/filter.port.js";
 import type { ProviderPort } from "./core/ports/provider.port.js";
 import type { OfferStorePort, StoreFactory } from "./core/ports/store.port.js";
@@ -68,6 +71,8 @@ export async function createApplication(
 	const providersText = workspace.configTexts["providers.yml"];
 	const pipelineText = workspace.configTexts["pipeline.yml"];
 	const profileText = workspace.configTexts["profile.yml"];
+	const publishersText = workspace.configTexts["publishers.yml"];
+	const events = createEventBus(buildPublishers(publishersText), warn);
 	const filters = await collectFilters(
 		root,
 		workspace.configTexts["extensions.yml"],
@@ -133,6 +138,7 @@ export async function createApplication(
 					scanDependencies(
 						{
 							providersText,
+							events,
 							pipelineText,
 							profileText,
 							pack,
@@ -215,6 +221,7 @@ async function checkFilterPort(
 /** The values scan needs that do not depend on which provider is being scanned. */
 interface ScanInputs {
 	providersText: string | null;
+	events: EventPort;
 	pipelineText: string | null;
 	profileText: string | null;
 	pack: CountryPack;
@@ -227,8 +234,15 @@ function scanDependencies(
 	providerId: string | undefined,
 	store: OfferStorePort,
 ): ScanDependencies {
-	const { providersText, pipelineText, profileText, pack, clock, filters } =
-		inputs;
+	const {
+		providersText,
+		events,
+		pipelineText,
+		profileText,
+		pack,
+		clock,
+		filters,
+	} = inputs;
 	const providers = selectProviders(
 		buildProviders(providersText),
 		providerId,
@@ -238,6 +252,7 @@ function scanDependencies(
 	}
 	return {
 		providers,
+		events,
 		store,
 		pack,
 		clock,

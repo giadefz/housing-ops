@@ -10,6 +10,7 @@ import {
 } from "../src/adapters/secondary/storage/sqlite/store.js";
 import { findOfferByListing } from "../src/adapters/secondary/storage/sqlite/offer.js";
 import { irelandPack } from "../src/countries/ie/pack.js";
+import type { PipelineEvent } from "../src/core/domain/events.js";
 import type { Listing } from "../src/core/domain/listing.js";
 import { budgetFilter } from "../src/core/filters/budget.js";
 import type { ClockPort } from "../src/core/ports/clock.port.js";
@@ -17,6 +18,7 @@ import type {
 	FetchContext,
 	ProviderPort,
 } from "../src/core/ports/provider.port.js";
+import type { EventPort } from "../src/core/ports/event.port.js";
 import type { Profile } from "../src/core/schemas/profile.js";
 import type { FilterStage } from "../src/core/services/pipeline.service.js";
 import { scan } from "../src/core/services/scan.service.js";
@@ -91,7 +93,13 @@ describe("scan", () => {
 			profile: profile(),
 			filters: [budgetStage],
 		});
-		expect(result).toEqual({ fetched: 1, stored: 1, deadLettered: 0 });
+		expect(result).toEqual({
+			fetched: 1,
+			stored: 1,
+			deadLettered: 0,
+			published: 0,
+			publishFailed: 0,
+		});
 		const offer = await findOfferByListing(database, "fake", "a");
 		expect(offer?.marketStatus).toBe("passed");
 		expect(verdicts(database)).toEqual([
@@ -143,7 +151,13 @@ describe("scan", () => {
 			profile: profile(),
 			filters: [budgetStage],
 		});
-		expect(result).toEqual({ fetched: 2, stored: 1, deadLettered: 1 });
+		expect(result).toEqual({
+			fetched: 2,
+			stored: 1,
+			deadLettered: 1,
+			published: 0,
+			publishFailed: 0,
+		});
 		const dead: unknown[] = database
 			.prepare("SELECT * FROM dead_letter")
 			.all();
@@ -239,5 +253,89 @@ describe("scan", () => {
 		expect(dwellings).toHaveLength(1);
 		expect(offers).toHaveLength(2);
 		expect(new Set(dwellingIds).size).toBe(1);
+	});
+});
+
+describe("scan publishing", () => {
+	function spyBus(fail = false): {
+		events: EventPort;
+		emitted: PipelineEvent[];
+	} {
+		const emitted: PipelineEvent[] = [];
+		return {
+			emitted,
+			events: {
+				async emit(event) {
+					emitted.push(event);
+					return [{ subscriber: "spy", event, ok: !fail }];
+				},
+			},
+		};
+	}
+
+	it("emits offer.passed for a newly passing offer", async () => {
+		const database = testDatabase();
+		const store = createSqliteStore(database);
+		const { events, emitted } = spyBus();
+		const result = await scan({
+			providers: [providerOf([listing("a")])],
+			events,
+			store,
+			pack: irelandPack,
+			clock,
+			profile: profile(),
+			filters: [budgetStage],
+		});
+		expect(emitted).toEqual(["offer.passed"]);
+		expect(result.published).toBe(1);
+		expect(result.publishFailed).toBe(0);
+	});
+
+	it("emits offer.updated when a relist changes", async () => {
+		const database = testDatabase();
+		const store = createSqliteStore(database);
+		const { events, emitted } = spyBus();
+		const base = {
+			store,
+			events,
+			pack: irelandPack,
+			clock,
+			profile: profile(),
+			filters: [budgetStage],
+		};
+		await scan({ ...base, providers: [providerOf([listing("a")])] });
+		await scan({
+			...base,
+			providers: [
+				providerOf([
+					listing("a", {
+						price: {
+							amount: 1800,
+							currency: "EUR",
+							period: "month",
+						},
+					}),
+				]),
+			],
+		});
+		expect(emitted).toEqual(["offer.passed", "offer.updated"]);
+	});
+
+	it("keeps the scan successful when a subscriber fails", async () => {
+		const database = testDatabase();
+		const store = createSqliteStore(database);
+		const { events } = spyBus(true);
+		const result = await scan({
+			providers: [providerOf([listing("a")])],
+			events,
+			store,
+			pack: irelandPack,
+			clock,
+			profile: profile(),
+			filters: [budgetStage],
+		});
+		expect(result.stored).toBe(1);
+		expect(result.published).toBe(0);
+		expect(result.publishFailed).toBe(1);
 	});
 });

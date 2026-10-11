@@ -5,6 +5,7 @@ import {
 	type Dwelling,
 	type NewDwelling,
 } from "../domain/dwelling.js";
+import type { PipelineEvent } from "../domain/events.js";
 import { normalizeListing, type NewOffer } from "../domain/listing.js";
 import {
 	clearFilters,
@@ -16,6 +17,7 @@ import type { Verdict } from "../domain/verdict.js";
 import { errorMessage } from "../errors/message.js";
 import type { ScanResult } from "../ports/application.port.js";
 import type { ClockPort } from "../ports/clock.port.js";
+import type { DispatchOutcome, EventPort } from "../ports/event.port.js";
 import type { FetchContext, ProviderPort } from "../ports/provider.port.js";
 import type {
 	DeadLetterEntry,
@@ -27,6 +29,7 @@ import { runFilters, type FilterStage } from "./pipeline.service.js";
 
 export interface ScanDependencies {
 	providers: ProviderPort[];
+	events?: EventPort;
 	store: OfferStorePort;
 	pack: CountryPack;
 	clock: ClockPort;
@@ -38,6 +41,7 @@ export interface ScanDependencies {
 
 interface ScanWiring {
 	store: OfferStorePort;
+	events: EventPort;
 	pack: CountryPack;
 	clock: ClockPort;
 	profile: Profile;
@@ -45,16 +49,34 @@ interface ScanWiring {
 	fetch: FetchContext;
 }
 
-const EMPTY_RESULT: ScanResult = { fetched: 0, stored: 0, deadLettered: 0 };
+const EMPTY_RESULT: ScanResult = {
+	fetched: 0,
+	stored: 0,
+	deadLettered: 0,
+	published: 0,
+	publishFailed: 0,
+};
+const NO_EVENTS: EventPort = {
+	async emit() {
+		return [];
+	},
+};
 const FETCH_TIMEOUT_MS = 60_000;
 
-type Outcome = "stored" | "deadLettered";
-
-/** Fetches from each provider, normalizes, filters, and stores. Bad records go to dead-letter. */
+/** Fetches from each provider, normalizes, filters, stores, and publishes. Bad records go to dead-letter. */
 export function scan(dependencies: ScanDependencies): Promise<ScanResult> {
-	const { providers, store, pack, clock, profile, filters } = dependencies;
+	const {
+		providers,
+		events = NO_EVENTS,
+		store,
+		pack,
+		clock,
+		profile,
+		filters,
+	} = dependencies;
 	const wiring: ScanWiring = {
 		store,
+		events,
 		pack,
 		clock,
 		profile,
@@ -99,7 +121,26 @@ interface RecordJob {
 	wiring: ScanWiring;
 }
 
-async function storeRecord(job: RecordJob): Promise<Outcome> {
+interface RecordOutcome {
+	stored: boolean;
+	published: number;
+	publishFailed: number;
+}
+
+async function storeRecord(job: RecordJob): Promise<RecordOutcome> {
+	const outcome = await tryStore(job);
+	if (!outcome.stored)
+		return { stored: false, published: 0, publishFailed: 0 };
+	return {
+		stored: true,
+		...(await emitFor(outcome.judged, outcome.changed, job.wiring.events)),
+	};
+}
+
+type StoreOutcome =
+	{ stored: true; judged: Judged; changed: boolean } | { stored: false };
+
+async function tryStore(job: RecordJob): Promise<StoreOutcome> {
 	const { record, provider, runId, wiring } = job;
 	const { store, pack, clock } = wiring;
 	try {
@@ -110,46 +151,81 @@ async function storeRecord(job: RecordJob): Promise<Outcome> {
 			fetchedAt,
 		});
 		const dwelling = await resolveDwelling(normalized.dwelling, wiring);
-		const offer = await resolveOffer({
+		const resolved = await resolveOffer({
 			provider,
 			newOffer: normalized.offer,
 			dwellingId: dwelling.id,
 			payload: record,
 			wiring,
 		});
-		const judged = judge(offer, dwelling, wiring);
+		const judged = judge(resolved.offer, dwelling, wiring);
 		await store.saveDwelling(dwelling);
 		await store.saveOffer(judged.offer);
-		await recordVerdicts(store, offer.id, runId, judged.verdicts);
-		return "stored";
+		await recordVerdicts(store, judged.offer.id, runId, judged.verdicts);
+		return { stored: true, judged, changed: resolved.changed };
 	} catch (error) {
 		await store.recordDeadLetter(
 			deadLetterEntry({ record, provider, runId, wiring, error }),
 		);
-		return "deadLettered";
+		return { stored: false };
 	}
+}
+
+interface PublishCounts {
+	published: number;
+	publishFailed: number;
+}
+
+async function emitFor(
+	judged: Judged,
+	changed: boolean,
+	events: EventPort,
+): Promise<PublishCounts> {
+	const event = scanEvent(judged, changed);
+	if (event === null) return { published: 0, publishFailed: 0 };
+	return countDeliveries(await events.emit(event, { offer: judged.offer }));
+}
+
+/** The milestone a stored offer emits, if any. */
+function scanEvent(judged: Judged, changed: boolean): PipelineEvent | null {
+	if (judged.passed) return "offer.passed";
+	if (changed) return "offer.updated";
+	return null;
+}
+
+function countDeliveries(outcomes: DispatchOutcome[]): PublishCounts {
+	let published = 0;
+	let publishFailed = 0;
+	for (const outcome of outcomes) {
+		if (outcome.ok) published += 1;
+		else publishFailed += 1;
+	}
+	return { published, publishFailed };
 }
 
 interface Judged {
 	offer: Offer;
 	verdicts: Verdict[];
+	passed: boolean;
 }
 
 /** Runs the pipeline on a first sighting; a filtered-out offer stays "seen". */
 function judge(offer: Offer, dwelling: Dwelling, wiring: ScanWiring): Judged {
-	if (offer.marketStatus !== "seen") return { offer, verdicts: [] };
+	if (offer.marketStatus !== "seen")
+		return { offer, verdicts: [], passed: false };
 	const run = runFilters(wiring.filters, {
 		offer,
 		dwelling,
 		profile: wiring.profile,
 		comparables: [],
 	});
-	if (!run.passed) return { offer, verdicts: run.verdicts };
+	if (!run.passed) return { offer, verdicts: run.verdicts, passed: false };
 	return {
 		offer: wiring.profile.gate
 			? parkForJudgment(offer)
 			: clearFilters(offer),
 		verdicts: run.verdicts,
+		passed: true,
 	};
 }
 
@@ -183,7 +259,12 @@ interface OfferJob {
 	wiring: ScanWiring;
 }
 
-async function resolveOffer(job: OfferJob): Promise<Offer> {
+interface ResolvedOffer {
+	offer: Offer;
+	changed: boolean;
+}
+
+async function resolveOffer(job: OfferJob): Promise<ResolvedOffer> {
 	const { provider, newOffer, dwellingId, payload, wiring } = job;
 	const { store } = wiring;
 	const existing = await store.findOfferByListing(
@@ -191,22 +272,25 @@ async function resolveOffer(job: OfferJob): Promise<Offer> {
 		newOffer.listingId,
 	);
 	return {
-		id: existing?.id ?? crypto.randomUUID(),
-		dwellingId,
-		provider: provider.id,
-		listingId: newOffer.listingId,
-		url: newOffer.url,
-		market: newOffer.market,
-		price: newOffer.price,
-		images: newOffer.images,
-		description: newOffer.description,
-		postedAt: newOffer.postedAt,
-		fetchedAt: newOffer.fetchedAt,
-		versions: nextVersions({ existing, newOffer, payload }),
-		marketStatus: existing?.marketStatus ?? "seen",
-		userStatus: existing?.userStatus ?? "none",
-		analyses: existing?.analyses ?? [],
-		interactions: existing?.interactions ?? [],
+		offer: {
+			id: existing?.id ?? crypto.randomUUID(),
+			dwellingId,
+			provider: provider.id,
+			listingId: newOffer.listingId,
+			url: newOffer.url,
+			market: newOffer.market,
+			price: newOffer.price,
+			images: newOffer.images,
+			description: newOffer.description,
+			postedAt: newOffer.postedAt,
+			fetchedAt: newOffer.fetchedAt,
+			versions: nextVersions({ existing, newOffer, payload }),
+			marketStatus: existing?.marketStatus ?? "seen",
+			userStatus: existing?.userStatus ?? "none",
+			analyses: existing?.analyses ?? [],
+			interactions: existing?.interactions ?? [],
+		},
+		changed: existing !== null && hasChanged(existing, newOffer),
 	};
 }
 
@@ -270,10 +354,14 @@ function deadLetterEntry(job: DeadLetterJob): DeadLetterEntry {
 	};
 }
 
-function countOutcome(outcome: Outcome): ScanResult {
-	return outcome === "stored"
-		? { fetched: 1, stored: 1, deadLettered: 0 }
-		: { fetched: 1, stored: 0, deadLettered: 1 };
+function countOutcome(outcome: RecordOutcome): ScanResult {
+	return {
+		fetched: 1,
+		stored: outcome.stored ? 1 : 0,
+		deadLettered: outcome.stored ? 0 : 1,
+		published: outcome.published,
+		publishFailed: outcome.publishFailed,
+	};
 }
 
 function addResults(left: ScanResult, right: ScanResult): ScanResult {
@@ -281,6 +369,8 @@ function addResults(left: ScanResult, right: ScanResult): ScanResult {
 		fetched: left.fetched + right.fetched,
 		stored: left.stored + right.stored,
 		deadLettered: left.deadLettered + right.deadLettered,
+		published: left.published + right.published,
+		publishFailed: left.publishFailed + right.publishFailed,
 	};
 }
 
@@ -292,6 +382,8 @@ function toRunStats(result: ScanResult): RunStats {
 		failed: result.deadLettered,
 		skipped: 0,
 		stored: result.stored,
+		published: result.published,
+		publishFailed: result.publishFailed,
 	};
 }
 
