@@ -51,7 +51,8 @@ Open risks to grill: scraping ToS per country; deduping the same listing across 
 - [x] Phase 4 — dedup + version history (recheck/delisting cut per D46–D48; 107 tests) — **Phase 4 complete**
 - [x] Phase 5 — queue + profile (`queue`, `verdict set`, `interact`, `profile get/set/digest`; D49–D54; 131 tests) — **Phase 5 complete**
 - [x] Phase 6 — publishers + gate (`publishers.yml`, process publisher + event bus, scan/judgment/closure events, `publish now`, gate verified; D57–D60; 162 tests) — **Phase 6 complete**
-- [ ] Next: implement Phase 7 — agent layer. Plan: `docs/plans/phase-7.md` (D61–D63 settled).
+- [x] Phase 7 — agent layer (`setup` command writes the five config documents + initialises the DB; `AGENTS.md` + flows; core-untouchable guardrail; onboarding end-to-end test through the CLI; D61–D64; 175 tests) — **Phase 7 complete**
+- [ ] Next: implement Phase 8 — packaging (LICENSE, CI, README status/quickstart, scheduling recipe).
 - [ ] Round 3+: scheduling, security of user-authored code, testing/CI, license
 
 ## Decisions
