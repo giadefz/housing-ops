@@ -50,7 +50,8 @@ Open risks to grill: scraping ToS per country; deduping the same listing across 
 - [x] Phase 3 — filters: contract + ordered runner, `pipeline.yml`, `filter list`/`check`, country gating, local discovery (approved `filters.local`), built-ins budget/bedrooms/location/type/size (102 tests; type/size uncommitted)
 - [x] Phase 4 — dedup + version history (recheck/delisting cut per D46–D48; 107 tests) — **Phase 4 complete**
 - [x] Phase 5 — queue + profile (`queue`, `verdict set`, `interact`, `profile get/set/digest`; D49–D54; 131 tests) — **Phase 5 complete**
-- [ ] Next: implement Phase 6 — publishers + gate. Plan: `docs/plans/phase-6.md` (D57–D60 settled)
+- [x] Phase 6 — publishers + gate (`publishers.yml`, process publisher + event bus, scan/judgment/closure events, `publish now`, gate verified; D57–D60; 162 tests) — **Phase 6 complete**
+- [ ] Next: Phase 7 — agent layer (`AGENTS.md` + skills, flows, setup).
 - [ ] Round 3+: scheduling, security of user-authored code, testing/CI, license
 
 ## Decisions

@@ -330,3 +330,45 @@ describe("scan publishing", () => {
 		expect(result.stored).toBe(1);
 	});
 });
+
+describe("scan gate", () => {
+	it("never parks a passing offer as pending when the gate is off", async () => {
+		const database = testDatabase();
+		const store = createSqliteStore(database);
+		await scan({
+			providers: [providerOf([listing("a")])],
+			events: silentBus,
+			store,
+			pack: irelandPack,
+			clock,
+			profile: profile({ gate: false }),
+			filters: [budgetStage],
+		});
+		const offer = await findOfferByListing(database, "fake", "a");
+		expect(offer?.marketStatus).toBe("passed");
+	});
+
+	it("parks a passing offer as pending when the gate is on, and still emits offer.passed", async () => {
+		const database = testDatabase();
+		const store = createSqliteStore(database);
+		const emitted: PipelineEvent[] = [];
+		const bus: EventBus = {
+			on() {},
+			async emit(event) {
+				emitted.push(event);
+			},
+		};
+		await scan({
+			providers: [providerOf([listing("a")])],
+			events: bus,
+			store,
+			pack: irelandPack,
+			clock,
+			profile: profile({ gate: true }),
+			filters: [budgetStage],
+		});
+		const offer = await findOfferByListing(database, "fake", "a");
+		expect(offer?.marketStatus).toBe("pending");
+		expect(emitted).toEqual(["offer.passed"]);
+	});
+});

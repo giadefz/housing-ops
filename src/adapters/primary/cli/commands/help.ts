@@ -14,7 +14,7 @@ const commands = [
 	{ name: "filter check <id>", status: "implemented" },
 	{ name: "provider list", status: "implemented" },
 	{ name: "provider test <id>", status: "implemented" },
-	{ name: "publish", status: "planned (Phase 6)" },
+	{ name: "publish now", status: "implemented" },
 ];
 
 /** The command menu. */

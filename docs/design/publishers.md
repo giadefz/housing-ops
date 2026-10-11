@@ -1,31 +1,78 @@
 # Publishers
 
-A publisher carries a pipeline event somewhere else. Publishers never judge
-and never mutate the DB — they read events and deliver them.
+A publisher carries a pipeline milestone somewhere else: a Telegram bot, your
+own API, a Playwright script that books a viewing, a webhook. Publishers never
+judge and never mutate the DB.
 
-## The contract
+## Subscription and transport
 
-A publisher has an id, a config schema that validates its own config, and a
-`publish` step taking an event and a payload. The events are `offer.passed`,
-`offer.updated`, and `offer.judged`. Payloads are the full `offer get` shape
-for the subject offer plus event metadata — a consumer never needs a second
-call, and a failed delivery never blocks the pipeline.
+A publisher has two parts, declared in `publishers.yml`:
+
+- **Subscription (when)** — the `events` it listens to.
+- **Transport (how)** — the `type`. v1 ships one: `process`.
+
+There is no separate "trigger type": the trigger is the subscription. Fast
+"push as soon as filters clear" and "only after the agent screened it" are the
+same mechanism with different `events`.
+
+## The process transport
+
+The core spawns `command` with `args` and `env`, writes one JSON document to its
+stdin, and waits for it to exit:
+
+```json
+{ "event": "offer.passed", "payload": { "offer": { "...": "the offer" } } }
+```
+
+- Exit `0` → delivered.
+- Non-zero exit, timeout, or spawn error → the failure is logged to stderr and
+  the run continues. A publisher never blocks a scan or a judgment.
+
+Anything that reads stdin is a publisher: Python, Node, `curl`, a Playwright
+script. The webhook is an example script, not a bundled adapter (D41, D57).
 
 ## Events
 
-- `offer.passed` — an offer cleared the deterministic pipeline (or the gate,
-  when on). The default and usually only subscription.
-- `offer.updated` — a known offer changed (price drop, fields, status).
-  Price drops are the high-value subscription.
-- `offer.judged` — an analysis landed on an offer.
+The milestones, each carrying `{ offer }` — the offer with its versions,
+analyses, and interactions, so a consumer never needs a second call:
 
-## v1 built-in: webhook
+- `offer.passed` — an offer newly clears the filters (status `passed` or
+  `pending`). The fast, pre-agent signal.
+- `offer.screened` — triage said `screened`.
+- `offer.shortlisted` — analysis said `shortlist`.
+- `offer.closed` — the listing is `let`, `sold`, or `gone`.
+- `offer.updated` — a known listing changed; a new version was recorded.
 
-Generic HTTP POST of the event payload, optional HMAC signature header,
-three delivery attempts with backoff, failures recorded on the run (never
-crashing it). Declared in the config alongside providers with a url, an
-optional secret, and the events it subscribes to.
+The payload type is tied to the event in code (`PipelineEventPayloads`), so
+adding an event without a payload is a compile error.
 
-The default terminal stays the to-evaluate queue you check with your agent —
-publishers are optional attachments. DynamoDB-push and Telegram are documented
-future/user-authored adapters, not v1 scope.
+## Delivery
+
+Events go through an in-process event bus built once at startup. Each publisher
+is registered for its `events`. Delivery is best-effort: handlers run in order,
+and one failing handler is logged without stopping the others or the emitter.
+
+`publish now --event <milestone> [--limit n]` re-delivers a state milestone over
+the stored offers currently in that state. It accepts `offer.passed`,
+`offer.screened`, `offer.shortlisted`, and `offer.closed`; `offer.updated` is a
+change, not a state, so it is not re-publishable.
+
+## Configuration
+
+`publishers.yml` (version 1) is its own config file, separate from
+`providers.yml`:
+
+```yaml
+version: 1
+publishers:
+  - id: telegram-fast
+    type: process
+    enabled: true
+    events: [offer.passed]
+    command: python
+    args: [publish/telegram.py]
+    env:
+      TELEGRAM_TOKEN: "..."
+```
+
+`timeoutMs` is optional. A disabled publisher is parsed but not registered.

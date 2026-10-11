@@ -17,5 +17,8 @@ Reach for a doc by the branch that matches:
 - **Changing code** — `docs/HOUSE-RULES.md`: naming, formatting, tests.
 - **Adding a source** ("add a provider", "scrape <portal>") —
   `skills/write-provider/`: how to write and test one.
+- **Pushing matches elsewhere** ("notify me", "Telegram", "webhook", "add a
+  publisher") — `skills/write-publisher/`: how to write a process publisher.
 
-Providers are user-side: the repo ships the machinery, not scrapers.
+Providers and publishers are user-side: the repo ships the machinery, not the
+implementations.
