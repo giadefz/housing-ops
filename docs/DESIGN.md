@@ -145,9 +145,9 @@ Phases run in order; each phase's criterion is the gate to the next.
   `publish now`.
   Done when: a passed offer triggers the webhook with the documented
   payload, and gate-off runs skip the pending state entirely.
-- **Phase 7 — agent layer.** `AGENTS.md` + shims; flow definitions;
-  onboarding end to end (`setup` plus the interview writes valid config;
-  `doctor` green).
+- **Phase 7 — agent layer.** `AGENTS.md` + flow definitions; onboarding end to
+  end (`setup` writes all five config files and initialises the DB). Plan:
+  `docs/plans/phase-7.md`.
   Done when: a fresh harness session can set up, scan, triage, and tune
   using only the flow docs.
 - **Phase 8 — breadth.** MyHome + Rent.ie adapters; scheduling recipes;

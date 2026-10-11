@@ -51,10 +51,16 @@ Open risks to grill: scraping ToS per country; deduping the same listing across 
 - [x] Phase 4 — dedup + version history (recheck/delisting cut per D46–D48; 107 tests) — **Phase 4 complete**
 - [x] Phase 5 — queue + profile (`queue`, `verdict set`, `interact`, `profile get/set/digest`; D49–D54; 131 tests) — **Phase 5 complete**
 - [x] Phase 6 — publishers + gate (`publishers.yml`, process publisher + event bus, scan/judgment/closure events, `publish now`, gate verified; D57–D60; 162 tests) — **Phase 6 complete**
-- [ ] Next: Phase 7 — agent layer (`AGENTS.md` + skills, flows, setup).
+- [ ] Next: implement Phase 7 — agent layer. Plan: `docs/plans/phase-7.md` (D61–D63 settled).
 - [ ] Round 3+: scheduling, security of user-authored code, testing/CI, license
 
 ## Decisions
+
+### Phase 7 scope (2026-10-11)
+
+- **D61 — `setup` takes the five config documents and writes the workspace.** The interview stays in the harness; `setup` is the deterministic, testable writer. The caller passes the five preformatted config documents — one JSON object keyed by filename (`profile.yml`, `pipeline.yml`, `providers.yml`, `publishers.yml`, `extensions.yml`), on stdin or via `--answers <file>`. `setup` validates each document against its existing `ConfigSchema`, writes them under `config/`, initialises the database, refuses to clobber an existing `profile.yml` unless `--force`, and returns `{ files, database }`. Extends D21.
+- **D62 — The core derives nothing; the config schemas are the predetermined format.** `setup` does not own onboarding semantics and invents no defaults: the agent authors the documents (it reads `config.md`), and the core only validates, writes, and initialises. There is no separate "answers" schema or file planner — the schema that defines a config file is the format the command accepts. Supersedes the "providers pre-checked" wording of D21/`flows.md`; the agent writes `providers.yml` empty (D41) and the `add-provider` flow fills it.
+- **D63 — Phase 7 is verified by a temp-workspace integration test.** A fresh directory: `setup` → `validate` all-green → `queue` empty `ok`. Applies the D33 rename to the agent-layer docs (`doctor` → `validate`).
 
 ### Phase 6 scope (2026-10-07)
 
