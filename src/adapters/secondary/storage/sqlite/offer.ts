@@ -5,7 +5,11 @@ import {
 	MARKETS,
 	USER_STATUSES,
 } from "../../../../core/domain/offer.js";
-import type { Offer, Price } from "../../../../core/domain/offer.js";
+import type {
+	MarketStatus,
+	Offer,
+	Price,
+} from "../../../../core/domain/offer.js";
 import { listAnalyses } from "./analysis.js";
 import { listInteractions } from "./interaction.js";
 import type { TableDefinition } from "./migrate.js";
@@ -219,4 +223,32 @@ export function listOfferIds(
 		.prepare("SELECT id FROM offers ORDER BY fetched_at DESC LIMIT ?")
 		.all(limit);
 	return records.flatMap((record) => (hasId(record) ? [record.id] : []));
+}
+
+/** Lists recent offer ids with the given market status, newest first. */
+export function listOfferIdsByStatus(
+	database: Database.Database,
+	status: MarketStatus,
+	limit: number,
+): string[] {
+	const records: unknown[] = database
+		.prepare(
+			"SELECT id FROM offers WHERE status = ? ORDER BY fetched_at DESC LIMIT ?",
+		)
+		.all(status, limit);
+	return records.flatMap((record) => (hasId(record) ? [record.id] : []));
+}
+
+/** Loads full offers with the given market status, newest first. */
+export async function listOffersByStatus(
+	database: Database.Database,
+	status: MarketStatus,
+	limit: number,
+): Promise<Offer[]> {
+	const offers: Offer[] = [];
+	for (const id of listOfferIdsByStatus(database, status, limit)) {
+		const offer = await findOffer(database, id);
+		if (offer !== null) offers.push(offer);
+	}
+	return offers;
 }

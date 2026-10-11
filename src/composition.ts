@@ -37,6 +37,7 @@ import {
 	type ProviderTrial,
 } from "./core/services/provider.service.js";
 import { listQueue } from "./core/services/queue.service.js";
+import { publishNow } from "./core/services/publish.service.js";
 import { scan, type ScanDependencies } from "./core/services/scan.service.js";
 import { setVerdict } from "./core/services/verdict.service.js";
 import {
@@ -125,6 +126,10 @@ export async function createApplication(
 					clock,
 					profile: parseProfile(profileText),
 				}),
+			),
+		publishNow: (input) =>
+			withStore(storeFactory, root, (store) =>
+				publishNow({ store, events, input }),
 			),
 		listProviders: () => listProviderSummaries(providersText),
 		listFilters: () => listFilters(pipelineText, pack.code, filters),

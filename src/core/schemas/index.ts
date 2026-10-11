@@ -35,11 +35,13 @@ export {
 	InteractionInputSchema,
 	ProfileGetSchema,
 	ProfileSetSchema,
+	PublishInputSchema,
 	QueueInputSchema,
 	VerdictInputSchema,
 	type InteractionInput,
 	type ProfileGetInput,
 	type ProfileSetInput,
+	type PublishInput,
 	type QueueInput,
 	type VerdictInput,
 } from "./requests.js";

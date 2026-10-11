@@ -92,6 +92,7 @@ export interface OfferStorePort {
 	recordAnalysis(analysis: Analysis): Promise<void>;
 	recordInteraction(interaction: Interaction): Promise<void>;
 	listQueue(status: MarketStatus, limit: number): Promise<OfferSummary[]>;
+	listOffersByStatus(status: MarketStatus, limit: number): Promise<Offer[]>;
 	countOffersByStatus(status: MarketStatus): Promise<number>;
 	loadDigest(): Promise<DigestData>;
 	listStoredOffers(limit: number): Promise<StoredOfferDetail[]>;

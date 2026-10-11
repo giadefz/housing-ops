@@ -33,7 +33,7 @@ against a mismatched api version and tells the user to update.
 | `filter check <id>` | id | `{ evaluated, pass, fail, skip, examples: [{ offerId, outcome, reason }] }` |
 | `provider list` | — | `{ providers: [{ id, type, country, markets, enabled }] }` |
 | `provider test <id>` | id | `{ fetched, sample: [Listing] }` — capped sample, validates interchange |
-| `publish now [--event offer.passed]` | flags | `{ published: [{ publisher, event, offer_id, ok }] }` |
+| `publish now [--event event] [--limit n]` | flags | `{ event, published }` — offers re-delivered |
 
 `OfferSummary` is the queue entry: `id, provider, price, address_short,
 bedrooms, size_m2, type, market_status, user_status, fetched_at`. Full payloads

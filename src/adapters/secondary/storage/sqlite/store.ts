@@ -18,6 +18,7 @@ import {
 	findOffer,
 	findOfferByListing,
 	listOfferIds,
+	listOffersByStatus,
 	saveOffer,
 } from "./offer.js";
 import { countOffersByStatus, listQueue } from "./queue.js";
@@ -53,6 +54,8 @@ export function createSqliteStore(database: Database.Database): OfferStorePort {
 		recordInteraction: (interaction) =>
 			recordInteraction(database, interaction),
 		listQueue: async (status, limit) => listQueue(database, status, limit),
+		listOffersByStatus: async (status, limit) =>
+			listOffersByStatus(database, status, limit),
 		countOffersByStatus: async (status) =>
 			countOffersByStatus(database, status),
 		loadDigest: async () => loadDigest(database),

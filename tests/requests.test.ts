@@ -3,6 +3,7 @@ import {
 	InteractionInputSchema,
 	ProfileGetSchema,
 	ProfileSetSchema,
+	PublishInputSchema,
 	QueueInputSchema,
 	VerdictInputSchema,
 } from "../src/core/schemas/requests.js";
@@ -94,5 +95,19 @@ describe("profile schemas", () => {
 		expect(ProfileSetSchema.safeParse({ path: "", value: 1 }).success).toBe(
 			false,
 		);
+	});
+});
+
+describe("PublishInputSchema", () => {
+	it("defaults the event and limit", () => {
+		expect(PublishInputSchema.parse({})).toEqual({
+			event: "offer.passed",
+			limit: 20,
+		});
+	});
+	it("rejects an event that is not re-publishable", () => {
+		expect(
+			PublishInputSchema.safeParse({ event: "offer.updated" }).success,
+		).toBe(false);
 	});
 });

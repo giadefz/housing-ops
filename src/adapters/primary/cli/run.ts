@@ -8,6 +8,7 @@ import { interactCommands } from "./commands/interact.js";
 import { offerCommands } from "./commands/offer.js";
 import { profileCommands } from "./commands/profile.js";
 import { providerCommands } from "./commands/provider.js";
+import { publishCommands } from "./commands/publish.js";
 import { queueCommands } from "./commands/queue.js";
 import { scanCommands } from "./commands/scan.js";
 import { systemCommands } from "./commands/system.js";
@@ -23,6 +24,7 @@ const commandHandlers: Record<string, CommandHandler> = {
 	...verdictCommands,
 	...interactCommands,
 	...profileCommands,
+	...publishCommands,
 	...scanCommands,
 };
 

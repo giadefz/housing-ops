@@ -56,3 +56,20 @@ export const ProfileSetSchema = z.object({
 
 /** The parsed profile set request. */
 export type ProfileSetInput = z.infer<typeof ProfileSetSchema>;
+
+/** The events `publish now` can re-deliver (the state milestones). */
+export const PUBLISH_EVENTS = [
+	"offer.passed",
+	"offer.screened",
+	"offer.shortlisted",
+	"offer.closed",
+] as const;
+
+/** A publish request: which event to re-deliver, and how many offers. */
+export const PublishInputSchema = z.object({
+	event: z.enum(PUBLISH_EVENTS).default("offer.passed"),
+	limit: z.number().int().positive().default(20),
+});
+
+/** The parsed publish request. */
+export type PublishInput = z.infer<typeof PublishInputSchema>;

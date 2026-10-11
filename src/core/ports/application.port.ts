@@ -1,11 +1,13 @@
 import type { Listing } from "../domain/listing.js";
 import type { Offer, UserStatus } from "../domain/offer.js";
+import type { PipelineEvent } from "../domain/events.js";
 import type { Verdict } from "../domain/verdict.js";
 import type { Profile } from "../schemas/profile.js";
 import type {
 	InteractionInput,
 	ProfileGetInput,
 	ProfileSetInput,
+	PublishInput,
 	QueueInput,
 	VerdictInput,
 } from "../schemas/requests.js";
@@ -113,6 +115,12 @@ export interface DigestResult {
 	generatedAt: string;
 }
 
+/** The result of a re-publish: which event, and how many offers it went out for. */
+export interface PublishResult {
+	event: PipelineEvent;
+	published: number;
+}
+
 /** One configured filter, as listed from pipeline.yml. */
 export interface FilterSummary {
 	id: string;
@@ -153,4 +161,5 @@ export interface ApplicationPort {
 	getProfile(input: ProfileGetInput): ProfileValueResult;
 	setProfile(input: ProfileSetInput): ProfileSetResult;
 	getDigest(): Promise<DigestResult>;
+	publishNow(input: PublishInput): Promise<PublishResult>;
 }
