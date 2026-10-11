@@ -97,7 +97,7 @@ The idea owes a debt to
 ## Quickstart
 
 ```bash
-git clone <this-repo> housing-ops
+git clone https://github.com/giadefz/housing-ops.git housing-ops
 cd housing-ops
 npm ci
 npm run build
