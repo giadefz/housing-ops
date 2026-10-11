@@ -17,7 +17,7 @@ import type { Verdict } from "../domain/verdict.js";
 import { errorMessage } from "../errors/message.js";
 import type { ScanResult } from "../ports/application.port.js";
 import type { ClockPort } from "../ports/clock.port.js";
-import type { DispatchOutcome, EventPort } from "../ports/event.port.js";
+import type { EventBus } from "../ports/event-bus.port.js";
 import type { FetchContext, ProviderPort } from "../ports/provider.port.js";
 import type {
 	DeadLetterEntry,
@@ -29,7 +29,7 @@ import { runFilters, type FilterStage } from "./pipeline.service.js";
 
 export interface ScanDependencies {
 	providers: ProviderPort[];
-	events?: EventPort;
+	events: EventBus;
 	store: OfferStorePort;
 	pack: CountryPack;
 	clock: ClockPort;
@@ -41,7 +41,7 @@ export interface ScanDependencies {
 
 interface ScanWiring {
 	store: OfferStorePort;
-	events: EventPort;
+	events: EventBus;
 	pack: CountryPack;
 	clock: ClockPort;
 	profile: Profile;
@@ -49,31 +49,13 @@ interface ScanWiring {
 	fetch: FetchContext;
 }
 
-const EMPTY_RESULT: ScanResult = {
-	fetched: 0,
-	stored: 0,
-	deadLettered: 0,
-	published: 0,
-	publishFailed: 0,
-};
-const NO_EVENTS: EventPort = {
-	async emit() {
-		return [];
-	},
-};
+const EMPTY_RESULT: ScanResult = { fetched: 0, stored: 0, deadLettered: 0 };
 const FETCH_TIMEOUT_MS = 60_000;
 
-/** Fetches from each provider, normalizes, filters, stores, and publishes. Bad records go to dead-letter. */
+/** Fetches from each provider, normalizes, filters, stores, and emits milestones. */
 export function scan(dependencies: ScanDependencies): Promise<ScanResult> {
-	const {
-		providers,
-		events = NO_EVENTS,
-		store,
-		pack,
-		clock,
-		profile,
-		filters,
-	} = dependencies;
+	const { providers, events, store, pack, clock, profile, filters } =
+		dependencies;
 	const wiring: ScanWiring = {
 		store,
 		events,
@@ -121,20 +103,13 @@ interface RecordJob {
 	wiring: ScanWiring;
 }
 
-interface RecordOutcome {
-	stored: boolean;
-	published: number;
-	publishFailed: number;
-}
+type Outcome = "stored" | "deadLettered";
 
-async function storeRecord(job: RecordJob): Promise<RecordOutcome> {
+async function storeRecord(job: RecordJob): Promise<Outcome> {
 	const outcome = await tryStore(job);
-	if (!outcome.stored)
-		return { stored: false, published: 0, publishFailed: 0 };
-	return {
-		stored: true,
-		...(await emitFor(outcome.judged, outcome.changed, job.wiring.events)),
-	};
+	if (!outcome.stored) return "deadLettered";
+	await emitEvent(outcome.judged, outcome.changed, job.wiring.events);
+	return "stored";
 }
 
 type StoreOutcome =
@@ -171,19 +146,15 @@ async function tryStore(job: RecordJob): Promise<StoreOutcome> {
 	}
 }
 
-interface PublishCounts {
-	published: number;
-	publishFailed: number;
-}
-
-async function emitFor(
+/** Emits the milestone a stored offer reached, if any. */
+async function emitEvent(
 	judged: Judged,
 	changed: boolean,
-	events: EventPort,
-): Promise<PublishCounts> {
+	events: EventBus,
+): Promise<void> {
 	const event = scanEvent(judged, changed);
-	if (event === null) return { published: 0, publishFailed: 0 };
-	return countDeliveries(await events.emit(event, { offer: judged.offer }));
+	if (event === null) return;
+	await events.emit(event, { offer: judged.offer });
 }
 
 /** The milestone a stored offer emits, if any. */
@@ -191,16 +162,6 @@ function scanEvent(judged: Judged, changed: boolean): PipelineEvent | null {
 	if (judged.passed) return "offer.passed";
 	if (changed) return "offer.updated";
 	return null;
-}
-
-function countDeliveries(outcomes: DispatchOutcome[]): PublishCounts {
-	let published = 0;
-	let publishFailed = 0;
-	for (const outcome of outcomes) {
-		if (outcome.ok) published += 1;
-		else publishFailed += 1;
-	}
-	return { published, publishFailed };
 }
 
 interface Judged {
@@ -354,14 +315,10 @@ function deadLetterEntry(job: DeadLetterJob): DeadLetterEntry {
 	};
 }
 
-function countOutcome(outcome: RecordOutcome): ScanResult {
-	return {
-		fetched: 1,
-		stored: outcome.stored ? 1 : 0,
-		deadLettered: outcome.stored ? 0 : 1,
-		published: outcome.published,
-		publishFailed: outcome.publishFailed,
-	};
+function countOutcome(outcome: Outcome): ScanResult {
+	return outcome === "stored"
+		? { fetched: 1, stored: 1, deadLettered: 0 }
+		: { fetched: 1, stored: 0, deadLettered: 1 };
 }
 
 function addResults(left: ScanResult, right: ScanResult): ScanResult {
@@ -369,8 +326,6 @@ function addResults(left: ScanResult, right: ScanResult): ScanResult {
 		fetched: left.fetched + right.fetched,
 		stored: left.stored + right.stored,
 		deadLettered: left.deadLettered + right.deadLettered,
-		published: left.published + right.published,
-		publishFailed: left.publishFailed + right.publishFailed,
 	};
 }
 
@@ -382,8 +337,6 @@ function toRunStats(result: ScanResult): RunStats {
 		failed: result.deadLettered,
 		skipped: 0,
 		stored: result.stored,
-		published: result.published,
-		publishFailed: result.publishFailed,
 	};
 }
 

@@ -1,8 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { createEventBus } from "../src/adapters/secondary/publishers/event-bus.js";
-import type { PipelineEvent } from "../src/core/domain/events.js";
+import { createEventBus } from "../src/adapters/secondary/event-bus.js";
 import type { Offer } from "../src/core/domain/offer.js";
-import type { PublisherPort } from "../src/core/ports/publisher.port.js";
 
 function offerFixture(): Offer {
 	return {
@@ -26,47 +24,32 @@ function offerFixture(): Offer {
 
 const payload = { offer: offerFixture() };
 
-function publisher(
-	id: string,
-	subscriptions: PipelineEvent[],
-	fail = false,
-): PublisherPort {
-	return {
-		id,
-		subscriptions,
-		async publish() {
-			if (fail) throw new Error("boom");
-		},
-	};
-}
-
 describe("createEventBus", () => {
-	it("routes an event to its subscribers only", async () => {
-		const bus = createEventBus(
-			[
-				publisher("a", ["offer.passed"]),
-				publisher("b", ["offer.screened"]),
-			],
-			() => {},
-		);
-		const outcomes = await bus.emit("offer.passed", payload);
-		expect(outcomes).toEqual([
-			{ subscriber: "a", event: "offer.passed", ok: true },
-		]);
+	it("calls only the handlers subscribed to the event", async () => {
+		const called: string[] = [];
+		const bus = createEventBus(() => {});
+		bus.on("offer.passed", () => {
+			called.push("passed");
+		});
+		bus.on("offer.screened", () => {
+			called.push("screened");
+		});
+		await bus.emit("offer.passed", payload);
+		expect(called).toEqual(["passed"]);
 	});
 
-	it("is best-effort: a failure is reported and logged, not thrown", async () => {
+	it("is best-effort: a failing handler is logged, the rest still run", async () => {
+		const called: string[] = [];
 		const logged: string[] = [];
-		const bus = createEventBus(
-			[
-				publisher("a", ["offer.passed"], true),
-				publisher("b", ["offer.passed"]),
-			],
-			(message) => logged.push(message),
-		);
-		const outcomes = await bus.emit("offer.passed", payload);
-		expect(outcomes[0]).toMatchObject({ subscriber: "a", ok: false });
-		expect(outcomes[1]).toMatchObject({ subscriber: "b", ok: true });
+		const bus = createEventBus((message) => logged.push(message));
+		bus.on("offer.passed", () => {
+			throw new Error("boom");
+		});
+		bus.on("offer.passed", () => {
+			called.push("second");
+		});
+		await bus.emit("offer.passed", payload);
+		expect(called).toEqual(["second"]);
 		expect(logged).toHaveLength(1);
 	});
 });

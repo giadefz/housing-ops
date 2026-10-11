@@ -10,8 +10,10 @@ import {
 	openStore,
 } from "../src/adapters/secondary/storage/sqlite/store.js";
 import type { Dwelling } from "../src/core/domain/dwelling.js";
+import type { PipelineEvent } from "../src/core/domain/events.js";
 import type { Offer } from "../src/core/domain/offer.js";
 import type { ClockPort } from "../src/core/ports/clock.port.js";
+import type { EventBus } from "../src/core/ports/event-bus.port.js";
 import { markOutcome } from "../src/core/services/market.service.js";
 
 let cleanups: Array<() => void> = [];
@@ -21,6 +23,7 @@ afterEach(() => {
 });
 
 const clock: ClockPort = { now: () => "2026-10-05T00:00:00.000Z" };
+const silentBus: EventBus = { on() {}, async emit() {} };
 
 function testStore(): {
 	database: Database.Database;
@@ -81,6 +84,7 @@ describe("markOutcome", () => {
 		const closed = await markOutcome({
 			store,
 			clock,
+			events: silentBus,
 			id: "offer-1",
 			outcome: "sold",
 		});
@@ -99,9 +103,41 @@ describe("markOutcome", () => {
 	it("refuses a second outcome on a closed listing", async () => {
 		const { store } = testStore();
 		await seed(store);
-		await markOutcome({ store, clock, id: "offer-1", outcome: "sold" });
+		await markOutcome({
+			store,
+			clock,
+			events: silentBus,
+			id: "offer-1",
+			outcome: "sold",
+		});
 		await expect(
-			markOutcome({ store, clock, id: "offer-1", outcome: "let" }),
+			markOutcome({
+				store,
+				clock,
+				events: silentBus,
+				id: "offer-1",
+				outcome: "let",
+			}),
 		).rejects.toThrow(/transition/);
+	});
+
+	it("emits offer.closed", async () => {
+		const { store } = testStore();
+		await seed(store);
+		const emitted: PipelineEvent[] = [];
+		const bus: EventBus = {
+			on() {},
+			async emit(event) {
+				emitted.push(event);
+			},
+		};
+		await markOutcome({
+			store,
+			clock,
+			events: bus,
+			id: "offer-1",
+			outcome: "sold",
+		});
+		expect(emitted).toEqual(["offer.closed"]);
 	});
 });

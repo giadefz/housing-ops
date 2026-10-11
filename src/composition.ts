@@ -9,8 +9,11 @@ import {
 	buildProviders,
 	listProviderSummaries,
 } from "./adapters/secondary/providers/registry.js";
-import { buildPublishers } from "./adapters/secondary/publishers/registry.js";
-import { createEventBus } from "./adapters/secondary/publishers/event-bus.js";
+import {
+	buildPublishers,
+	registerPublishers,
+} from "./adapters/secondary/publishers/registry.js";
+import { createEventBus } from "./adapters/secondary/event-bus.js";
 import type { CountryPack } from "./core/domain/country-pack.js";
 import { FilterNotFoundError } from "./core/errors/filter.js";
 import { ProviderNotFoundError } from "./core/errors/provider.js";
@@ -20,7 +23,7 @@ import type {
 	ScanResult,
 } from "./core/ports/application.port.js";
 import type { ClockPort } from "./core/ports/clock.port.js";
-import type { EventPort } from "./core/ports/event.port.js";
+import type { EventBus } from "./core/ports/event-bus.port.js";
 import type { FilterPort } from "./core/ports/filter.port.js";
 import type { ProviderPort } from "./core/ports/provider.port.js";
 import type { OfferStorePort, StoreFactory } from "./core/ports/store.port.js";
@@ -72,7 +75,8 @@ export async function createApplication(
 	const pipelineText = workspace.configTexts["pipeline.yml"];
 	const profileText = workspace.configTexts["profile.yml"];
 	const publishersText = workspace.configTexts["publishers.yml"];
-	const events = createEventBus(buildPublishers(publishersText), warn);
+	const events = createEventBus(warn);
+	registerPublishers(events, buildPublishers(publishersText));
 	const filters = await collectFilters(
 		root,
 		workspace.configTexts["extensions.yml"],
@@ -95,7 +99,7 @@ export async function createApplication(
 			),
 		setVerdict: (id, input) =>
 			withStore(storeFactory, root, (store) =>
-				setVerdict({ store, clock, id, input }),
+				setVerdict({ store, clock, events, id, input }),
 			),
 		interact: (id, input) =>
 			withStore(storeFactory, root, (store) =>
@@ -221,7 +225,7 @@ async function checkFilterPort(
 /** The values scan needs that do not depend on which provider is being scanned. */
 interface ScanInputs {
 	providersText: string | null;
-	events: EventPort;
+	events: EventBus;
 	pipelineText: string | null;
 	profileText: string | null;
 	pack: CountryPack;

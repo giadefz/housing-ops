@@ -55,8 +55,6 @@ export interface ScanResult {
 	fetched: number;
 	stored: number;
 	deadLettered: number;
-	published: number;
-	publishFailed: number;
 }
 
 /** One page of the queue for a status, plus the total number of offers in it. */

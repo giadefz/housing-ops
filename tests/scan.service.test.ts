@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import type Database from "better-sqlite3";
 import { afterEach, describe, expect, it } from "vitest";
+import { createEventBus } from "../src/adapters/secondary/event-bus.js";
 import {
 	closeStore,
 	createSqliteStore,
@@ -14,11 +15,11 @@ import type { PipelineEvent } from "../src/core/domain/events.js";
 import type { Listing } from "../src/core/domain/listing.js";
 import { budgetFilter } from "../src/core/filters/budget.js";
 import type { ClockPort } from "../src/core/ports/clock.port.js";
+import type { EventBus } from "../src/core/ports/event-bus.port.js";
 import type {
 	FetchContext,
 	ProviderPort,
 } from "../src/core/ports/provider.port.js";
-import type { EventPort } from "../src/core/ports/event.port.js";
 import type { Profile } from "../src/core/schemas/profile.js";
 import type { FilterStage } from "../src/core/services/pipeline.service.js";
 import { scan } from "../src/core/services/scan.service.js";
@@ -29,6 +30,10 @@ afterEach(() => {
 	cleanups = [];
 });
 
+const clock: ClockPort = { now: () => "2026-10-04T00:00:00.000Z" };
+const budgetStage: FilterStage = { filter: budgetFilter, missing: "fail" };
+const silentBus: EventBus = { on() {}, async emit() {} };
+
 function testDatabase(): Database.Database {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), "housing-ops-"));
 	const database = openStore(path.join(root, "housing.db"));
@@ -38,9 +43,6 @@ function testDatabase(): Database.Database {
 	});
 	return database;
 }
-
-const clock: ClockPort = { now: () => "2026-10-04T00:00:00.000Z" };
-const budgetStage: FilterStage = { filter: budgetFilter, missing: "fail" };
 
 function profile(overrides: Partial<Profile> = {}): Profile {
 	return {
@@ -87,19 +89,14 @@ describe("scan", () => {
 		const store = createSqliteStore(database);
 		const result = await scan({
 			providers: [providerOf([listing("a")])],
+			events: silentBus,
 			store,
 			pack: irelandPack,
 			clock,
 			profile: profile(),
 			filters: [budgetStage],
 		});
-		expect(result).toEqual({
-			fetched: 1,
-			stored: 1,
-			deadLettered: 0,
-			published: 0,
-			publishFailed: 0,
-		});
+		expect(result).toEqual({ fetched: 1, stored: 1, deadLettered: 0 });
 		const offer = await findOfferByListing(database, "fake", "a");
 		expect(offer?.marketStatus).toBe("passed");
 		expect(verdicts(database)).toEqual([
@@ -112,6 +109,7 @@ describe("scan", () => {
 		const store = createSqliteStore(database);
 		await scan({
 			providers: [providerOf([listing("a")])],
+			events: silentBus,
 			store,
 			pack: irelandPack,
 			clock,
@@ -127,6 +125,7 @@ describe("scan", () => {
 		const store = createSqliteStore(database);
 		await scan({
 			providers: [providerOf([listing("a")])],
+			events: silentBus,
 			store,
 			pack: irelandPack,
 			clock,
@@ -145,19 +144,14 @@ describe("scan", () => {
 		const store = createSqliteStore(database);
 		const result = await scan({
 			providers: [providerOf([listing("ok"), { listing_id: "bad" }])],
+			events: silentBus,
 			store,
 			pack: irelandPack,
 			clock,
 			profile: profile(),
 			filters: [budgetStage],
 		});
-		expect(result).toEqual({
-			fetched: 2,
-			stored: 1,
-			deadLettered: 1,
-			published: 0,
-			publishFailed: 0,
-		});
+		expect(result).toEqual({ fetched: 2, stored: 1, deadLettered: 1 });
 		const dead: unknown[] = database
 			.prepare("SELECT * FROM dead_letter")
 			.all();
@@ -169,6 +163,7 @@ describe("scan", () => {
 		const store = createSqliteStore(database);
 		const dependencies = {
 			providers: [providerOf([listing("a")])],
+			events: silentBus,
 			store,
 			pack: irelandPack,
 			clock,
@@ -189,6 +184,7 @@ describe("scan", () => {
 		const database = testDatabase();
 		const store = createSqliteStore(database);
 		const base = {
+			events: silentBus,
 			store,
 			pack: irelandPack,
 			clock,
@@ -235,6 +231,7 @@ describe("scan", () => {
 				providerOf([listing("x", shared)], "one"),
 				providerOf([listing("y", shared)], "two"),
 			],
+			events: silentBus,
 			store,
 			pack: irelandPack,
 			clock,
@@ -257,29 +254,24 @@ describe("scan", () => {
 });
 
 describe("scan publishing", () => {
-	function spyBus(fail = false): {
-		events: EventPort;
-		emitted: PipelineEvent[];
-	} {
+	function spyBus(): { bus: EventBus; emitted: PipelineEvent[] } {
 		const emitted: PipelineEvent[] = [];
-		return {
-			emitted,
-			events: {
-				async emit(event) {
-					emitted.push(event);
-					return [{ subscriber: "spy", event, ok: !fail }];
-				},
+		const bus: EventBus = {
+			on() {},
+			async emit(event) {
+				emitted.push(event);
 			},
 		};
+		return { bus, emitted };
 	}
 
 	it("emits offer.passed for a newly passing offer", async () => {
 		const database = testDatabase();
 		const store = createSqliteStore(database);
-		const { events, emitted } = spyBus();
-		const result = await scan({
+		const { bus, emitted } = spyBus();
+		await scan({
 			providers: [providerOf([listing("a")])],
-			events,
+			events: bus,
 			store,
 			pack: irelandPack,
 			clock,
@@ -287,17 +279,15 @@ describe("scan publishing", () => {
 			filters: [budgetStage],
 		});
 		expect(emitted).toEqual(["offer.passed"]);
-		expect(result.published).toBe(1);
-		expect(result.publishFailed).toBe(0);
 	});
 
 	it("emits offer.updated when a relist changes", async () => {
 		const database = testDatabase();
 		const store = createSqliteStore(database);
-		const { events, emitted } = spyBus();
+		const { bus, emitted } = spyBus();
 		const base = {
 			store,
-			events,
+			events: bus,
 			pack: irelandPack,
 			clock,
 			profile: profile(),
@@ -321,13 +311,16 @@ describe("scan publishing", () => {
 		expect(emitted).toEqual(["offer.passed", "offer.updated"]);
 	});
 
-	it("keeps the scan successful when a subscriber fails", async () => {
+	it("keeps the scan successful when a handler throws", async () => {
 		const database = testDatabase();
 		const store = createSqliteStore(database);
-		const { events } = spyBus(true);
+		const bus = createEventBus(() => {});
+		bus.on("offer.passed", () => {
+			throw new Error("boom");
+		});
 		const result = await scan({
 			providers: [providerOf([listing("a")])],
-			events,
+			events: bus,
 			store,
 			pack: irelandPack,
 			clock,
@@ -335,7 +328,5 @@ describe("scan publishing", () => {
 			filters: [budgetStage],
 		});
 		expect(result.stored).toBe(1);
-		expect(result.published).toBe(0);
-		expect(result.publishFailed).toBe(1);
 	});
 });

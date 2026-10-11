@@ -9,8 +9,10 @@ import {
 	openStore,
 } from "../src/adapters/secondary/storage/sqlite/store.js";
 import type { Dwelling } from "../src/core/domain/dwelling.js";
+import type { PipelineEvent } from "../src/core/domain/events.js";
 import type { Offer } from "../src/core/domain/offer.js";
 import type { ClockPort } from "../src/core/ports/clock.port.js";
+import type { EventBus } from "../src/core/ports/event-bus.port.js";
 import { setVerdict } from "../src/core/services/verdict.service.js";
 
 let cleanups: Array<() => void> = [];
@@ -20,6 +22,7 @@ afterEach(() => {
 });
 
 const clock: ClockPort = { now: () => "2026-10-07T00:00:00.000Z" };
+const silentBus: EventBus = { on() {}, async emit() {} };
 
 function testStore(): {
 	database: Database.Database;
@@ -81,6 +84,7 @@ describe("setVerdict", () => {
 		const result = await setVerdict({
 			store,
 			clock,
+			events: silentBus,
 			id: "offer-1",
 			input: {
 				tier: "triage",
@@ -105,6 +109,7 @@ describe("setVerdict", () => {
 		await setVerdict({
 			store,
 			clock,
+			events: silentBus,
 			id: "offer-1",
 			input: {
 				tier: "analyse",
@@ -129,6 +134,7 @@ describe("setVerdict", () => {
 			setVerdict({
 				store,
 				clock,
+				events: silentBus,
 				id: "offer-1",
 				input: { tier: "triage", verdict: "shortlist", reason: "x" },
 			}),
@@ -141,9 +147,66 @@ describe("setVerdict", () => {
 			setVerdict({
 				store,
 				clock,
+				events: silentBus,
 				id: "missing",
 				input: { tier: "triage", verdict: "reject", reason: "x" },
 			}),
 		).rejects.toThrow(/not found/);
+	});
+});
+
+function spyBus(): { bus: EventBus; emitted: PipelineEvent[] } {
+	const emitted: PipelineEvent[] = [];
+	const bus: EventBus = {
+		on() {},
+		async emit(event) {
+			emitted.push(event);
+		},
+	};
+	return { bus, emitted };
+}
+
+describe("setVerdict events", () => {
+	it("emits offer.screened on a triage screened", async () => {
+		const store = await seed("pending");
+		const { bus, emitted } = spyBus();
+		await setVerdict({
+			store,
+			clock,
+			events: bus,
+			id: "offer-1",
+			input: {
+				tier: "triage",
+				verdict: "screened",
+				reason: "worth a look",
+			},
+		});
+		expect(emitted).toEqual(["offer.screened"]);
+	});
+
+	it("emits offer.shortlisted on an analyse shortlist", async () => {
+		const store = await seed("screened");
+		const { bus, emitted } = spyBus();
+		await setVerdict({
+			store,
+			clock,
+			events: bus,
+			id: "offer-1",
+			input: { tier: "analyse", verdict: "shortlist", reason: "great" },
+		});
+		expect(emitted).toEqual(["offer.shortlisted"]);
+	});
+
+	it("emits nothing for a reject", async () => {
+		const store = await seed("pending");
+		const { bus, emitted } = spyBus();
+		await setVerdict({
+			store,
+			clock,
+			events: bus,
+			id: "offer-1",
+			input: { tier: "triage", verdict: "reject", reason: "no" },
+		});
+		expect(emitted).toEqual([]);
 	});
 });
