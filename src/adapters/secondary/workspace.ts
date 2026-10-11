@@ -3,11 +3,13 @@ import fs from "node:fs";
 import path from "node:path";
 import yaml from "js-yaml";
 import {
+	CONFIG_FILES,
 	ExtensionApprovalSchema,
 	ExtensionsFileSchema,
 } from "../../core/schemas/index.js";
 import type { ConfigFile } from "../../core/schemas/index.js";
 import type { Profile } from "../../core/schemas/profile.js";
+import type { WorkspacePlan } from "../../core/services/setup.service.js";
 import type { WorkspaceInput } from "../../core/services/validate.service.js";
 import { readSchemaVersion, SCHEMA_VERSION } from "./storage/sqlite/migrate.js";
 
@@ -40,6 +42,14 @@ export function writeProfile(root: string, profile: Profile): void {
 		yaml.dump({ ...profile, version: 1 }),
 		"utf8",
 	);
+}
+
+/** Writes the five config documents under `config/`, creating the directory if needed. */
+export function writeWorkspace(root: string, plan: WorkspacePlan): void {
+	fs.mkdirSync(path.join(root, "config"), { recursive: true });
+	for (const file of CONFIG_FILES) {
+		fs.writeFileSync(configPath(root, file), yaml.dump(plan[file]), "utf8");
+	}
 }
 
 export function databasePath(root: string): string {
