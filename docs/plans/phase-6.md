@@ -65,11 +65,11 @@ not thrown.
 
 ### 6c — scan emits events
 
-`scan.service` (or the publish step around it) emits `offer.passed` when an
-offer newly clears the filters, and `offer.updated` when `nextVersions` appended
-a version. Run stats gain published/failed counts.
+`scan.service` emits `offer.passed` when an offer newly clears the filters, and
+`offer.updated` when `nextVersions` appended a version. Events go through the
+event bus; a failed handler is logged and never blocks the run.
 Done when: a subscribed publisher receives `offer.passed` for a new pass and
-`offer.updated` for a changed relist; a broken publisher does not fail the scan.
+`offer.updated` for a changed relist; a broken handler does not fail the scan.
 
 ### 6d — judgment and closure events
 
