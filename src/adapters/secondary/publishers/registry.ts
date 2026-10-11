@@ -1,7 +1,6 @@
 import yaml from "js-yaml";
 import { ConfigError } from "../../../core/errors/config.js";
 import { errorMessage } from "../../../core/errors/message.js";
-import type { EventBus } from "../../../core/ports/event-bus.port.js";
 import type { PublisherPort } from "../../../core/ports/publisher.port.js";
 import {
 	PublishersFileSchema,
@@ -16,18 +15,6 @@ export function buildPublishers(
 	return parsePublishers(publishersText)
 		.filter((entry) => entry.enabled)
 		.map((entry) => createProcessPublisher(entry));
-}
-
-/** Registers each publisher's subscribed events on the bus. */
-export function registerPublishers(
-	bus: EventBus,
-	publishers: PublisherPort[],
-): void {
-	for (const publisher of publishers) {
-		for (const event of publisher.subscriptions) {
-			bus.on(event, (payload) => publisher.publish(event, payload));
-		}
-	}
 }
 
 /** Parses publishers.yml into its entries. An invalid file throws. */

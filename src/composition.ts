@@ -9,11 +9,7 @@ import {
 	buildProviders,
 	listProviderSummaries,
 } from "./adapters/secondary/providers/registry.js";
-import {
-	buildPublishers,
-	registerPublishers,
-} from "./adapters/secondary/publishers/registry.js";
-import { createEventBus } from "./adapters/secondary/event-bus.js";
+import { createEventBusBuilder } from "./adapters/secondary/publishers/event-bus-builder.js";
 import type { CountryPack } from "./core/domain/country-pack.js";
 import { FilterNotFoundError } from "./core/errors/filter.js";
 import { ProviderNotFoundError } from "./core/errors/provider.js";
@@ -75,8 +71,9 @@ export async function createApplication(
 	const pipelineText = workspace.configTexts["pipeline.yml"];
 	const profileText = workspace.configTexts["profile.yml"];
 	const publishersText = workspace.configTexts["publishers.yml"];
-	const events = createEventBus(warn);
-	registerPublishers(events, buildPublishers(publishersText));
+	const events = createEventBusBuilder(warn)
+		.withPublishers(publishersText)
+		.build();
 	const filters = await collectFilters(
 		root,
 		workspace.configTexts["extensions.yml"],
