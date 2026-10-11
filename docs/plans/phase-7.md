@@ -9,8 +9,8 @@ Plan for the implementing agent. Before starting, read `docs/design/flows.md`,
 - A fresh workspace can be set up in one deterministic call: `setup` writes all
   five config files and initialises the DB.
 - `validate` is all-green on that workspace and `queue` returns an empty `ok`.
-- The agent-facing docs describe onboarding end to end, with no reference to the
-  retired `doctor` command (D33).
+- The agent-facing docs describe onboarding end to end, with no design or usage
+  doc presenting the retired `doctor` command (D33).
 
 ## Model (D61, D62)
 
@@ -74,7 +74,8 @@ where flows live). Reconcile `docs/design/flows.md`: `doctor` → `validate`
 everywhere, the `setup` answers contract, the empty-`providers.yml` scaffold.
 Fix the Phase 7 wording in `DESIGN.md`. Add the `setup` row to `api.md` and the
 onboarding note to `config.md`.
-Done when: no doc references `doctor`, and the setup flow matches the command.
+Done when: no design or usage doc presents `doctor` as a live command (the
+decision log keeps the rename history), and the setup flow matches the command.
 
 ### 7e — integration test
 

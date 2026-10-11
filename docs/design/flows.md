@@ -8,10 +8,13 @@ file plus the api surface.
 
 - **setup** — triggers: first run, "set me up", new country/market.
   Steps: interview (country defaulting to IE, market, budget + currency,
-  areas/commute, type/beds/size, deal-breakers, providers pre-checked,
-  publisher choice) → write the four config files → init the DB → `doctor`
-  until green.
-  Done when: `doctor` reports all checks ok and `queue` runs empty without error.
+  areas/commute, type/beds/size, deal-breakers, gate) → author the five config
+  documents (`profile.yml`, a `pipeline.yml` enabling the filters that match the
+  answers, and empty `providers.yml`/`publishers.yml`/`extensions.yml`) → write
+  them and init the DB with `housing-ops setup` (stdin or `--answers`) → run
+  `validate` until green → wire a provider with the add-provider flow.
+  Done when: `validate` reports all checks ok and `queue` runs empty without
+  error.
 - **review** — triggers: "what's new", a grown queue, after a scan.
   Steps: `scan` if stale → `queue` → walk the to-evaluate list oldest-first,
   triaging each (light verdicts via `verdict set --tier triage`) → deep-analyse
@@ -41,12 +44,13 @@ file plus the api surface.
   the search".
   Steps: `profile digest` → compare the explicit profile against
   favorited-vs-rejected stats → propose concrete profile or pipeline edits with
-  predicted effect → apply on approval via `profile set` or YAML edit → `doctor`.
+  predicted effect → apply on approval via `profile set` or YAML edit →
+  `validate`.
   Done when: the user accepts or rejects each proposal, and accepted edits
   validate.
-- **doctor** — triggers: session start, after any config edit, on any
+- **validate** — triggers: session start, after any config edit, on any
   command failure.
-  Steps: run `doctor`, fix findings in order, re-run.
+  Steps: run `validate`, fix findings in order, re-run.
   Done when: all checks green.
 - **draft-message** (optional) — triggers: "message the agent about X".
   Steps: draft from the offer + profile context; present for approval.

@@ -18,7 +18,7 @@ against a mismatched api version and tells the user to update.
 
 | Command | Input | `data` on success |
 |---|---|---|
-| `setup [--country ie --market rent]` | flags | `{ config: {profile, pipeline, providers}, db }` — paths written |
+| `setup [--answers file] [--force]` | five config documents (JSON on stdin or `--answers`) | `{ files: [name], database }` — paths written; refuses an existing profile unless `--force` |
 | `validate` | — | `{ findings: [{ name, ok, detail? }] }` — config, schemas, approvals, database, api compat |
 | `version` | — | `{ core, api }` |
 | `scan [--provider id]` | flags | `{ fetched, stored, deadLettered }` |

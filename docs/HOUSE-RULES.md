@@ -40,9 +40,9 @@ with each other, ask.
 ## Naming
 
 - Command words (what the user types) are affordances: short, borrowing
-  CLI convention (`doctor`, `scan`, `queue`). Borrowing is good UX.
+  CLI convention (`validate`, `scan`, `queue`). Borrowing is good UX.
 - Code words are domain language: verbs acting on real concepts. Never
-  stack an empty verb on a metaphor (`runDoctor`, `doScan`, `performCheck`).
+  stack an empty verb on a metaphor (`runValidation`, `doScan`, `performCheck`).
 - The sentence test: say it about the real world — "check the system's
   health", "scan the portals", "judge this offer". If you can't, rename.
 - Load-bearing words are defined once (ubiquitous language) and reused
