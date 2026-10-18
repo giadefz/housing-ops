@@ -18,10 +18,11 @@ import {
 /** Analyses table. Recorded judgments on offers, cheap or deep, append-only. */
 export const analysisTable: TableDefinition = {
 	table: "analyses",
-	dependsOn: ["offers"],
+	dependsOn: ["members", "offers"],
 	createTable: `
 CREATE TABLE analyses (
 	id TEXT PRIMARY KEY,
+	member_id TEXT NOT NULL REFERENCES members(id),
 	offer_id TEXT NOT NULL REFERENCES offers(id),
 	tier TEXT NOT NULL,
 	verdict TEXT NOT NULL,

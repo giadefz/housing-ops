@@ -4,17 +4,25 @@ import type { ApplicationPort } from "../../../../core/ports/application.port.js
 import { ConfigSchema } from "../../../../core/schemas/config.js";
 import type { Config } from "../../../../core/schemas/config.js";
 import { fail, ok } from "../envelope.js";
+import { readString } from "./flags.js";
 import type { CommandHandler } from "./types.js";
 
 const USAGE =
-	"usage: housing-ops config get | config set <file> (or pipe the JSON on stdin)";
+	"usage: housing-ops config get | config set <file> | config import [--name <name>] [--force]";
 
-/** Config commands: read or replace the shared config document. */
+/** Config commands: read, replace, or import the shared config document. */
 export const configCommands: Record<string, CommandHandler> = {
 	config: async (app, args) => {
 		const [subcommand, file] = [args.rest[0], args.rest[1]];
 		if (subcommand === "get") return ok(await app.getConfig());
 		if (subcommand === "set") return setConfig(app, file);
+		if (subcommand === "import")
+			return ok(
+				await app.importConfig({
+					name: readString(args.flags["name"]) ?? "Home",
+					force: args.flags["force"] === true,
+				}),
+			);
 		return fail({ code: "USAGE", message: USAGE });
 	},
 };

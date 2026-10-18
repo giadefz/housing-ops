@@ -238,15 +238,22 @@ export interface InitCommand {
 	force: boolean;
 }
 
+/** A request to import a legacy workspace's config files. */
+export interface ImportConfigCommand {
+	name: string;
+	force: boolean;
+}
+
 /** Admin reads: version and workspace validation. */
 export interface AdminPort {
 	getVersion(): VersionInfo;
 	validateWorkspace(): ValidationReport;
 }
 
-/** Bootstrap and config: init, the shared config, and member profiles. */
+/** Bootstrap and config: init, import, the shared config, and member profiles. */
 export interface ConfigPort {
 	init(request: InitCommand): Promise<InitResult>;
+	importConfig(request: ImportConfigCommand): Promise<InitResult>;
 	getConfig(): Promise<Config>;
 	setConfig(config: Config): Promise<Config>;
 	getProfile(input: ProfileGetQuery): Promise<ProfileValueResult>;

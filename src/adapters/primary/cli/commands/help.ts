@@ -8,6 +8,7 @@ const commands = [
 	{ name: "init --file <file>", status: "implemented" },
 	{ name: "config get", status: "implemented" },
 	{ name: "config set <file>", status: "implemented" },
+	{ name: "config import [--name <name>]", status: "implemented" },
 	{ name: "queue", status: "implemented" },
 	{ name: "feed status", status: "implemented" },
 	{ name: "feed fill", status: "implemented" },

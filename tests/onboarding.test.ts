@@ -77,6 +77,42 @@ function writeJson(root: string, name: string, value: unknown): string {
 	return file;
 }
 
+function writeLegacyConfig(root: string): void {
+	const directory = path.join(root, "config");
+	fs.mkdirSync(directory, { recursive: true });
+	fs.writeFileSync(
+		path.join(directory, "profile.yml"),
+		`version: 1
+market: rent
+country: ie
+budget:
+  max: 2200
+  currency: EUR
+areas:
+  - Dublin 8
+gate: false
+recheckHours: 48
+`,
+	);
+	fs.writeFileSync(
+		path.join(directory, "pipeline.yml"),
+		`version: 1
+filters:
+  - id: budget
+    enabled: true
+    missing: skip
+`,
+	);
+	fs.writeFileSync(
+		path.join(directory, "providers.yml"),
+		"version: 1\nproviders: []\n",
+	);
+	fs.writeFileSync(
+		path.join(directory, "publishers.yml"),
+		"version: 1\npublishers: []\n",
+	);
+}
+
 describe("onboarding end to end", () => {
 	it("initializes, validates, and queues from an empty workspace over the CLI", async () => {
 		const root = emptyRoot();
@@ -134,6 +170,59 @@ describe("onboarding end to end", () => {
 		const get = await cli(root, "config", "get");
 		if (!get.ok) throw new Error(JSON.stringify(get.error));
 		expect(get.data).toEqual(next);
+	});
+
+	it("imports the legacy config files over the CLI", async () => {
+		const root = emptyRoot();
+		writeLegacyConfig(root);
+
+		const imported = await cli<InitResult>(
+			root,
+			"config",
+			"import",
+			"--name",
+			"Home",
+		);
+		if (!imported.ok) throw new Error(JSON.stringify(imported.error));
+		expect(imported.data.instance).toEqual({
+			version: 1,
+			name: "Home",
+			country: "ie",
+			market: "rent",
+			interfaces: ["cli"],
+		});
+		expect(fs.existsSync(path.join(root, "instance.yml"))).toBe(true);
+
+		const config = await cli(root, "config", "get");
+		if (!config.ok) throw new Error(JSON.stringify(config.error));
+		expect(config.data).toMatchObject({
+			pipeline: {
+				filters: [{ id: "budget", enabled: true, missing: "skip" }],
+			},
+			providers: { providers: [] },
+			publishers: { publishers: [] },
+		});
+
+		const profile = await cli(root, "profile", "get", "budget.max");
+		if (!profile.ok) throw new Error(JSON.stringify(profile.error));
+		expect(profile.data).toEqual({ path: "budget.max", value: 2200 });
+
+		const validate = await cli<ValidationReport>(root, "validate");
+		if (!validate.ok) throw new Error(JSON.stringify(validate.error));
+		expect(validate.data.findings.filter((finding) => !finding.ok)).toEqual(
+			[],
+		);
+	});
+
+	it("refuses to import when the legacy files are missing", async () => {
+		const root = emptyRoot();
+		const imported = await cli(root, "config", "import");
+		expect(imported.ok).toBe(false);
+		if (imported.ok) throw new Error("expected import failure");
+		expect(imported.error.code).toBe("CONFIG_ERROR");
+		expect(fs.existsSync(path.join(root, "data", "housing.db"))).toBe(
+			false,
+		);
 	});
 
 	it("refuses to re-init without force, then replaces with force", async () => {

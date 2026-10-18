@@ -28,8 +28,6 @@ CREATE TABLE offers (
 	description TEXT NOT NULL DEFAULT '',
 	posted_at TEXT,
 	fetched_at TEXT NOT NULL,
-	status TEXT NOT NULL,
-	user_status TEXT NOT NULL DEFAULT 'none',
 	UNIQUE(provider, listing_id)
 );`,
 };

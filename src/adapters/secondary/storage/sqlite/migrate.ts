@@ -29,13 +29,15 @@ export interface TableDefinition {
 /** Ordered schema migrations. Applied once, in order, atomically. */
 interface Migration {
 	version: number;
-	statements: string[];
+	statements: string[] | ((database: Database.Database) => string[]);
 }
 
 const ENTITY_TABLES: TableDefinition[] = [
 	dwellingTable,
 	offerTable,
 	offerVersionTable,
+	memberTable,
+	decisionTable,
 	poolTable,
 	feedTable,
 	feedCursorTable,
@@ -50,22 +52,46 @@ const ENTITY_TABLES: TableDefinition[] = [
 	providersStateTable,
 ];
 
+/** Tables added after the original schema, in dependency order. */
+const NEW_MODEL_TABLES: TableDefinition[] = [
+	memberTable,
+	decisionTable,
+	poolTable,
+	feedTable,
+	feedCursorTable,
+	configTable,
+	memberProfileTable,
+];
+
 /** Seeds the built-in member the local CLI acts as. */
 const SEED_DEFAULT_MEMBER = `
-INSERT INTO members (id, name, role, created_at)
+INSERT OR IGNORE INTO members (id, name, role, created_at)
 SELECT '${DEFAULT_MEMBER_ID}', 'Local', 'admin', strftime('%Y-%m-%dT%H:%M:%fZ', 'now');`;
 
-/** Gives every existing offer a decision for the built-in member. */
+/** The old statuses that were judgments, not filter results. */
+const JUDGMENT_STATUSES =
+	"'screened','shortlisted','rejected','held','let','sold','gone'";
+
+/** Moves judgments and reactions into decisions. Filter-only rows stay out. */
 const BACKFILL_DECISIONS = `
 INSERT OR IGNORE INTO decisions (member_id, offer_id, market_status, user_status)
-SELECT '${DEFAULT_MEMBER_ID}', id, status, user_status FROM offers;`;
+SELECT '${DEFAULT_MEMBER_ID}', id,
+	CASE WHEN status IN (${JUDGMENT_STATUSES}) THEN status ELSE NULL END,
+	user_status
+FROM offers
+WHERE status IN (${JUDGMENT_STATUSES}) OR user_status != 'none';`;
 
-/** Re-projects every offer's status into its decision, so statuses written after v2 survive the drop. */
-const RESYNC_DECISIONS = `
-INSERT INTO decisions (member_id, offer_id, market_status, user_status)
-SELECT '${DEFAULT_MEMBER_ID}', id, status, user_status FROM offers WHERE true
-ON CONFLICT(member_id, offer_id) DO UPDATE SET
-market_status = excluded.market_status, user_status = excluded.user_status;`;
+/** Offers that passed the old filter become the pool. */
+const BACKFILL_POOL = `
+INSERT OR IGNORE INTO pool (offer_id, entered_at)
+SELECT id, fetched_at FROM offers WHERE status != 'seen';`;
+
+/** The old queue becomes the feed: pending waited for judgment, passed flowed through. */
+const BACKFILL_FEED = `
+INSERT OR IGNORE INTO feed (member_id, offer_id, added_at, state)
+SELECT '${DEFAULT_MEMBER_ID}', id, fetched_at,
+	CASE WHEN status = 'pending' THEN 'to-evaluate' ELSE 'accepted' END
+FROM offers WHERE status IN ('passed', 'pending');`;
 
 /** Scopes recorded judgments and reactions to a member. Existing rows belong to the built-in member. */
 const ADD_MEMBER_SCOPE = [
@@ -79,6 +105,15 @@ const DROP_OFFER_STATUS = [
 	"ALTER TABLE offers DROP COLUMN user_status;",
 ];
 
+/** The one existing-workspace upgrade: v1 to the multi-member model. */
+const LEGACY_UPGRADE = [
+	...ADD_MEMBER_SCOPE,
+	BACKFILL_DECISIONS,
+	BACKFILL_POOL,
+	BACKFILL_FEED,
+	...DROP_OFFER_STATUS,
+];
+
 const MIGRATIONS: Migration[] = [
 	{
 		version: 1,
@@ -88,22 +123,30 @@ const MIGRATIONS: Migration[] = [
 	},
 	{
 		version: 2,
-		statements: [
-			memberTable.createTable,
-			SEED_DEFAULT_MEMBER,
-			decisionTable.createTable,
-			BACKFILL_DECISIONS,
-		],
-	},
-	{
-		version: 3,
-		statements: [
-			RESYNC_DECISIONS,
-			...ADD_MEMBER_SCOPE,
-			...DROP_OFFER_STATUS,
-		],
+		statements: upgradeToNewModel,
 	},
 ];
+
+/** Creates the new tables when upgrading a v1 database, then seeds the built-in member. */
+function upgradeToNewModel(database: Database.Database): string[] {
+	const legacy = !hasTable(database, "members");
+	return [
+		...(legacy
+			? orderTables(NEW_MODEL_TABLES).map((table) => table.createTable)
+			: []),
+		SEED_DEFAULT_MEMBER,
+		...(legacy ? LEGACY_UPGRADE : []),
+	];
+}
+
+function hasTable(database: Database.Database, table: string): boolean {
+	const row: unknown = database
+		.prepare(
+			"SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+		)
+		.get(table);
+	return row !== undefined;
+}
 
 function latestVersion(): number {
 	return MIGRATIONS.reduce(
@@ -147,8 +190,11 @@ export function migrate(database: Database.Database): void {
 	);
 	const apply = database.transaction((waiting: Migration[]) => {
 		for (const migration of waiting) {
-			for (const statement of migration.statements)
-				database.exec(statement);
+			const statements =
+				typeof migration.statements === "function"
+					? migration.statements(database)
+					: migration.statements;
+			for (const statement of statements) database.exec(statement);
 			database
 				.prepare(
 					"INSERT INTO _migrations (version, applied_at) VALUES (?, ?)",

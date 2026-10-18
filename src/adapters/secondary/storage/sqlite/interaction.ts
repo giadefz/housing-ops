@@ -8,10 +8,11 @@ import { CorruptRecordError, parseEnum, recordId } from "./record.js";
 /** Interactions table. Recorded user reactions on offers, append-only. */
 export const interactionTable: TableDefinition = {
 	table: "interactions",
-	dependsOn: ["offers"],
+	dependsOn: ["members", "offers"],
 	createTable: `
 CREATE TABLE interactions (
 	id TEXT PRIMARY KEY,
+	member_id TEXT NOT NULL REFERENCES members(id),
 	offer_id TEXT NOT NULL REFERENCES offers(id),
 	action TEXT NOT NULL,
 	reason TEXT,

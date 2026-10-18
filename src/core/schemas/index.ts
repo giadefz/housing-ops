@@ -1,10 +1,3 @@
-import { z } from "zod";
-import { BaseConfig } from "./base.js";
-import { PipelineFileSchema } from "./pipeline.js";
-import { ProfileFileSchema, ProfileSchema } from "./profile.js";
-import { ProvidersFileSchema } from "./providers.js";
-import { PublishersFileSchema } from "./publishers.js";
-
 export {
 	ExtensionApprovalSchema,
 	ExtensionsFileSchema,
@@ -45,23 +38,3 @@ export {
 	type QueueInput,
 	type VerdictInput,
 } from "./requests.js";
-
-export const CONFIG_FILES = [
-	"profile.yml",
-	"pipeline.yml",
-	"providers.yml",
-	"publishers.yml",
-	"extensions.yml",
-] as const;
-
-/** The config filenames owned by the core. */
-export type ConfigFile = (typeof CONFIG_FILES)[number];
-
-/** The schema for each config file, keyed by filename. */
-export const ConfigSchemas: Record<ConfigFile, z.ZodType> = {
-	"profile.yml": ProfileFileSchema,
-	"pipeline.yml": PipelineFileSchema,
-	"providers.yml": ProvidersFileSchema,
-	"publishers.yml": PublishersFileSchema,
-	"extensions.yml": BaseConfig,
-};
