@@ -22,7 +22,7 @@ describe("buildProviders", () => {
 		expect(providers.has("fake")).toBe(true);
 		expect(providers.get("fake")?.markets).toEqual(["rent"]);
 	});
-	it("returns an empty map when there is no providers.yml", () => {
+	it("returns an empty map when there is no providers config", () => {
 		expect(buildProviders(null).size).toBe(0);
 	});
 	it("throws ConfigError on an unknown provider type", () => {
@@ -53,7 +53,7 @@ describe("listProviderSummaries", () => {
 			},
 		]);
 	});
-	it("returns an empty list when there is no providers.yml", () => {
+	it("returns an empty list when there is no providers config", () => {
 		expect(listProviderSummaries(null)).toEqual([]);
 	});
 });

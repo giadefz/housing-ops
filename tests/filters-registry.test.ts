@@ -51,7 +51,7 @@ describe("listFilters", () => {
 			},
 		]);
 	});
-	it("returns nothing without pipeline.yml", () => {
+	it("returns nothing without a pipeline config", () => {
 		expect(listFilters(null, "ie", bundledFilters)).toEqual([]);
 	});
 	it("throws ConfigError on malformed YAML", () => {

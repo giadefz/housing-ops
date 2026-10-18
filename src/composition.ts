@@ -1,18 +1,23 @@
+import yaml from "js-yaml";
 import {
 	buildFilterStages,
 	collectFilters,
 	listFilters,
 } from "./adapters/secondary/filters/registry.js";
 import { profileCoverageWarnings } from "./adapters/secondary/filters/coverage.js";
-import { parseProfile, tryParseProfile } from "./adapters/secondary/profile.js";
+import { assertInstanceWritable } from "./adapters/secondary/instance.js";
 import type { WorkspaceReadRequest } from "./adapters/secondary/workspace.js";
+import type { WorkspaceFiles } from "./adapters/secondary/workspace.js";
 import {
 	buildProviders,
 	listProviderSummaries,
 } from "./adapters/secondary/providers/registry.js";
 import { createEventBusBuilder } from "./adapters/secondary/publishers/event-bus-builder.js";
+import { CorruptRecordError } from "./adapters/secondary/storage/sqlite/record.js";
 import type { CountryPack } from "./core/domain/country-pack.js";
+import { DEFAULT_MEMBER_ID } from "./core/domain/member.js";
 import { FilterNotFoundError } from "./core/errors/filter.js";
+import { ProfileNotFoundError } from "./core/errors/profile.js";
 import { ProviderNotFoundError } from "./core/errors/provider.js";
 import type {
 	ApplicationPort,
@@ -24,7 +29,10 @@ import type { EventBus } from "./core/ports/event-bus.port.js";
 import type { FilterPort } from "./core/ports/filter.port.js";
 import type { ProviderPort } from "./core/ports/provider.port.js";
 import type { OfferStorePort, StoreFactory } from "./core/ports/store.port.js";
+import type { Config } from "./core/schemas/config.js";
+import type { Instance } from "./core/schemas/instance.js";
 import type { Profile } from "./core/schemas/profile.js";
+import { getConfig, setConfig } from "./core/services/config.service.js";
 import { buildDigest } from "./core/services/digest.service.js";
 import {
 	emptyFeed,
@@ -32,11 +40,12 @@ import {
 	getFeedStatus,
 } from "./core/services/feed.service.js";
 import { checkFilter } from "./core/services/filter.service.js";
+import { initWorkspace } from "./core/services/init.service.js";
 import { interact } from "./core/services/interaction.service.js";
 import { getOffer } from "./core/services/offer.service.js";
 import {
-	readProfileValue,
-	setProfileValue,
+	getMemberProfile,
+	setMemberProfile,
 } from "./core/services/profile.service.js";
 import {
 	testProvider as runProviderTest,
@@ -45,10 +54,6 @@ import {
 import { listQueue } from "./core/services/queue.service.js";
 import { publishNow } from "./core/services/publish.service.js";
 import { scan, type ScanDependencies } from "./core/services/scan.service.js";
-import {
-	setupWorkspace,
-	type WorkspacePlan,
-} from "./core/services/setup.service.js";
 import { setVerdict } from "./core/services/verdict.service.js";
 import {
 	validateWorkspace,
@@ -63,9 +68,8 @@ const CHECK_EXAMPLE_LIMIT = 5;
 /** The concrete adapters the application is wired with. */
 export interface ApplicationDependencies {
 	storeFactory: StoreFactory;
-	readWorkspace: (request: WorkspaceReadRequest) => WorkspaceInput;
-	writeProfile: (root: string, profile: Profile) => void;
-	writeWorkspace: (root: string, plan: WorkspacePlan, force: boolean) => void;
+	readWorkspaceFiles: (request: WorkspaceReadRequest) => WorkspaceFiles;
+	writeInstance: (root: string, instance: Instance, force: boolean) => void;
 	clock: ClockPort;
 	pack: CountryPack;
 	warn: (message: string) => void;
@@ -78,36 +82,29 @@ export async function createApplication(
 ): Promise<ApplicationPort> {
 	const {
 		storeFactory,
-		readWorkspace,
-		writeProfile,
-		writeWorkspace,
+		readWorkspaceFiles,
+		writeInstance: writeInstanceFile,
 		clock,
 		pack,
 		warn,
 	} = dependencies;
-	const workspace = readWorkspace({
+	const snapshot = await readStoreSnapshot(storeFactory, root);
+	const workspace = readWorkspaceFiles({
 		root,
 		store: storeFactory.describe(root),
 		expectedSchemaVersion: storeFactory.targetSchemaVersion,
 	});
-	const providersText = workspace.configTexts["providers.yml"];
-	const pipelineText = workspace.configTexts["pipeline.yml"];
-	const profileText = workspace.configTexts["profile.yml"];
-	const publishersText = workspace.configTexts["publishers.yml"];
+	const { config, profile } = snapshot;
+	const pipelineText = config === null ? null : yaml.dump(config.pipeline);
+	const providersText = config === null ? null : yaml.dump(config.providers);
+	const publishersText =
+		config === null ? null : yaml.dump(config.publishers);
 	const events = createEventBusBuilder(warn)
 		.withPublishers(publishersText)
 		.build();
-	const filters = await collectFilters(
-		root,
-		workspace.configTexts["extensions.yml"],
-	);
-	const setupInputs = {
-		write: (plan: WorkspacePlan, force: boolean) =>
-			writeWorkspace(root, plan, force),
-		initStore: () => storeFactory.init(root),
-	};
+	const filters = await collectFilters(root, workspace.extensionsText);
 	warnOnProfileGaps({
-		profileText,
+		profile,
 		pipelineText,
 		country: pack.code,
 		filters,
@@ -115,9 +112,38 @@ export async function createApplication(
 	});
 	return {
 		getVersion,
-		validateWorkspace: () => validateWorkspace(workspace),
-		setup: (input, force) =>
-			setupWorkspace({ input, force, ...setupInputs }),
+		validateWorkspace: () =>
+			validateWorkspace({
+				instanceText: workspace.instanceText,
+				config,
+				profile,
+				configError: snapshot.configError,
+				profileError: snapshot.profileError,
+				extensionsText: workspace.extensionsText,
+				currentHashes: workspace.currentHashes,
+				store: workspace.store,
+				expectedSchemaVersion: workspace.expectedSchemaVersion,
+			}),
+		init: async (request) => {
+			assertInstanceWritable(root, request.force);
+			const description = storeFactory.init(root);
+			return withStore(storeFactory, root, (store) =>
+				initWorkspace({
+					input: request.input,
+					force: request.force,
+					writeInstance: (instance, force) =>
+						writeInstanceFile(root, instance, force),
+					store,
+					database: description.location,
+				}),
+			);
+		},
+		getConfig: () =>
+			withStore(storeFactory, root, (store) => getConfig({ store })),
+		setConfig: (next) =>
+			withStore(storeFactory, root, (store) =>
+				setConfig({ store, config: next }),
+			),
 		getOffer: (input) =>
 			withStore(storeFactory, root, (store) =>
 				getOffer(store, input.memberId, input.offerId),
@@ -139,7 +165,7 @@ export async function createApplication(
 				fillFeed({
 					store,
 					events,
-					profile: parseProfile(profileText),
+					profile: requireProfile(profile),
 					filters: buildFilterStages(
 						pipelineText,
 						pack.code,
@@ -173,28 +199,29 @@ export async function createApplication(
 					input: input.interaction,
 				}),
 			),
-		getProfile: (input) => ({
-			path: input.path ?? null,
-			value: readProfileValue(parseProfile(profileText), input.path),
-		}),
-		setProfile: (input) => {
-			const updated = setProfileValue(
-				parseProfile(profileText),
-				input.path,
-				input.value,
-			);
-			writeProfile(root, updated);
-			return {
-				path: input.path,
-				value: readProfileValue(updated, input.path),
-			};
-		},
+		getProfile: (input) =>
+			withStore(storeFactory, root, (store) =>
+				getMemberProfile({
+					store,
+					memberId: input.memberId,
+					path: input.path,
+				}),
+			),
+		setProfile: (input) =>
+			withStore(storeFactory, root, (store) =>
+				setMemberProfile({
+					store,
+					memberId: input.memberId,
+					path: input.path,
+					value: input.value,
+				}),
+			),
 		getDigest: (input) =>
 			withStore(storeFactory, root, (store) =>
 				buildDigest({
 					store,
 					clock,
-					profile: parseProfile(profileText),
+					profile: requireProfile(profile),
 					memberId: input.memberId,
 				}),
 			),
@@ -211,7 +238,12 @@ export async function createApplication(
 		listFilters: () => listFilters(pipelineText, pack.code, filters),
 		checkFilter: (id) =>
 			withStore(storeFactory, root, (store) =>
-				checkFilterPort({ filters, profileText, id, store }),
+				checkFilterPort({
+					filters,
+					profile: requireProfile(profile),
+					id,
+					store,
+				}),
 			),
 		testProvider: (id) => runProviderTest(providerTrial(providersText, id)),
 		scan: (input) =>
@@ -222,7 +254,7 @@ export async function createApplication(
 							providersText,
 							events,
 							pipelineText,
-							profileText,
+							profile: requireProfile(profile),
 							pack,
 							clock,
 							filters,
@@ -236,8 +268,66 @@ export async function createApplication(
 	};
 }
 
+interface StoreSnapshot {
+	config: Config | null;
+	profile: Profile | null;
+	configError?: string;
+	profileError?: string;
+}
+
+/** Reads the shared config and the admin profile from the store. */
+async function readStoreSnapshot(
+	storeFactory: StoreFactory,
+	root: string,
+): Promise<StoreSnapshot> {
+	const description = storeFactory.describe(root);
+	if (description.schemaVersion === null)
+		return { config: null, profile: null };
+	const handle = storeFactory.open(root);
+	try {
+		return {
+			...(await readSnapshotConfig(handle.store)),
+			...(await readSnapshotProfile(handle.store)),
+		};
+	} finally {
+		handle.close();
+	}
+}
+
+async function readSnapshotConfig(
+	store: OfferStorePort,
+): Promise<Pick<StoreSnapshot, "config" | "configError">> {
+	try {
+		return { config: await store.readConfig() };
+	} catch (error) {
+		if (error instanceof CorruptRecordError)
+			return { config: null, configError: error.message };
+		throw error;
+	}
+}
+
+async function readSnapshotProfile(
+	store: OfferStorePort,
+): Promise<Pick<StoreSnapshot, "profile" | "profileError">> {
+	try {
+		return {
+			profile: await store.readMemberProfile(DEFAULT_MEMBER_ID),
+		};
+	} catch (error) {
+		if (error instanceof CorruptRecordError)
+			return { profile: null, profileError: error.message };
+		throw error;
+	}
+}
+
+/** Returns the admin profile, or throws when it is not initialized. */
+function requireProfile(profile: Profile | null): Profile {
+	if (profile === null) throw new ProfileNotFoundError(DEFAULT_MEMBER_ID);
+	return profile;
+}
+
 interface ProfileGapInput {
-	profileText: string | null;
+	profile: Profile | null;
 	pipelineText: string | null;
 	country: string;
 	filters: Map<string, FilterPort>;
@@ -246,14 +336,13 @@ interface ProfileGapInput {
 
 /** Reports profile fields and enabled filters that do not line up, at boot. */
 function warnOnProfileGaps(input: ProfileGapInput): void {
-	const profile = tryParseProfile(input.profileText);
-	if (profile === null) return;
+	if (input.profile === null) return;
 	const stages = buildFilterStages(
 		input.pipelineText,
 		input.country,
 		input.filters,
 	);
-	const warnings = profileCoverageWarnings(stages, profile);
+	const warnings = profileCoverageWarnings(stages, input.profile);
 	for (const warning of warnings) input.warn(warning);
 }
 
@@ -281,7 +370,7 @@ function providerTrial(
 
 interface FilterCheckRequest {
 	filters: Map<string, FilterPort>;
-	profileText: string | null;
+	profile: Profile;
 	id: string;
 	store: OfferStorePort;
 }
@@ -289,12 +378,12 @@ interface FilterCheckRequest {
 async function checkFilterPort(
 	request: FilterCheckRequest,
 ): Promise<FilterCheckResult> {
-	const { filters, profileText, id, store } = request;
+	const { filters, profile, id, store } = request;
 	const filter = filters.get(id);
 	if (filter === undefined) throw new FilterNotFoundError(id);
 	return checkFilter({
 		filter,
-		profile: parseProfile(profileText),
+		profile,
 		samples: await store.listStoredOffers(CHECK_SAMPLE_LIMIT),
 		exampleLimit: CHECK_EXAMPLE_LIMIT,
 	});
@@ -305,7 +394,7 @@ interface ScanInputs {
 	providersText: string | null;
 	events: EventBus;
 	pipelineText: string | null;
-	profileText: string | null;
+	profile: Profile;
 	pack: CountryPack;
 	clock: ClockPort;
 	filters: Map<string, FilterPort>;
@@ -321,7 +410,7 @@ function scanDependencies(
 		providersText,
 		events,
 		pipelineText,
-		profileText,
+		profile,
 		pack,
 		clock,
 		filters,
@@ -340,7 +429,7 @@ function scanDependencies(
 		store,
 		pack,
 		clock,
-		profile: parseProfile(profileText),
+		profile,
 		filters: buildFilterStages(pipelineText, pack.code, filters),
 		memberId,
 	};

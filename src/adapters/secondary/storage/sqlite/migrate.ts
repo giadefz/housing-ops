@@ -2,6 +2,7 @@ import fs from "node:fs";
 import Database from "better-sqlite3";
 import { DEFAULT_MEMBER_ID } from "../../../../core/domain/member.js";
 import { analysisTable } from "./analysis.js";
+import { configTable } from "./config.js";
 import { deadLetterTable } from "./dead-letter.js";
 import { decisionTable } from "./decision.js";
 import { dwellingTable } from "./dwelling.js";
@@ -10,6 +11,7 @@ import { feedCursorTable } from "./feed-cursor.js";
 import { interactionTable } from "./interaction.js";
 import { marketEventTable } from "./market-event.js";
 import { memberTable } from "./member.js";
+import { memberProfileTable } from "./member-profile.js";
 import { offerTable } from "./offer.js";
 import { offerVersionTable } from "./offer-version.js";
 import { poolTable } from "./pool.js";
@@ -37,6 +39,8 @@ const ENTITY_TABLES: TableDefinition[] = [
 	poolTable,
 	feedTable,
 	feedCursorTable,
+	configTable,
+	memberProfileTable,
 	verdictTable,
 	runTable,
 	deadLetterTable,

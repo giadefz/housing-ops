@@ -26,14 +26,19 @@ export const profileCommands: Record<string, CommandHandler> = {
 	},
 };
 
-function readProfile(app: ApplicationPort, path: string | undefined) {
+async function readProfile(app: ApplicationPort, path: string | undefined) {
 	const parsed = ProfileGetSchema.safeParse({ path: readString(path) });
 	if (!parsed.success)
 		return fail({ code: "VALIDATION", message: parsed.error.message });
-	return ok(app.getProfile(parsed.data));
+	return ok(
+		await app.getProfile({
+			...parsed.data,
+			memberId: CLI_MEMBER_ID,
+		}),
+	);
 }
 
-function updateProfile(
+async function updateProfile(
 	app: ApplicationPort,
 	path: string | undefined,
 	raw: string,
@@ -47,7 +52,12 @@ function updateProfile(
 	const parsed = ProfileSetSchema.safeParse({ path, value });
 	if (!parsed.success)
 		return fail({ code: "VALIDATION", message: parsed.error.message });
-	return ok(app.setProfile(parsed.data));
+	return ok(
+		await app.setProfile({
+			...parsed.data,
+			memberId: CLI_MEMBER_ID,
+		}),
+	);
 }
 
 function parseJson(raw: string): unknown | typeof INVALID_JSON {

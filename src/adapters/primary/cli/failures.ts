@@ -1,5 +1,8 @@
 import { AppError } from "../../../core/errors/app-error.js";
-import { ConfigError } from "../../../core/errors/config.js";
+import {
+	ConfigError,
+	ConfigNotFoundError,
+} from "../../../core/errors/config.js";
 import { InvalidDwellingError } from "../../../core/errors/dwelling.js";
 import { InvalidListingError } from "../../../core/errors/listing.js";
 import { FilterNotFoundError } from "../../../core/errors/filter.js";
@@ -16,10 +19,11 @@ import {
 import { PublisherError } from "../../../core/errors/publisher.js";
 import {
 	InvalidProfileValueError,
+	ProfileNotFoundError,
 	ProfilePathError,
 } from "../../../core/errors/profile.js";
 import { StoreNotInitializedError } from "../../../core/errors/storage.js";
-import { WorkspaceExistsError } from "../../../core/errors/setup.js";
+import { InstanceExistsError } from "../../../core/errors/instance.js";
 import type { Failure } from "./envelope.js";
 
 interface FailureSpec {
@@ -42,6 +46,10 @@ const failureSpecs = new Map<AppErrorClass, FailureSpec>([
 	[InvalidVerdictError, { code: "INVALID_VERDICT" }],
 	[ProfilePathError, { code: "PROFILE_PATH_NOT_FOUND" }],
 	[InvalidProfileValueError, { code: "INVALID_PROFILE_VALUE" }],
+	[
+		ProfileNotFoundError,
+		{ code: "PROFILE_NOT_FOUND", hint: "run housing-ops init" },
+	],
 	[InvalidDwellingError, { code: "INVALID_DWELLING" }],
 	[InvalidListingError, { code: "INVALID_LISTING" }],
 	[
@@ -52,7 +60,7 @@ const failureSpecs = new Map<AppErrorClass, FailureSpec>([
 		ProviderNotFoundError,
 		{
 			code: "PROVIDER_NOT_FOUND",
-			hint: "run housing-ops validate to check providers.yml",
+			hint: "run housing-ops validate to check the config",
 		},
 	],
 	[
@@ -71,14 +79,18 @@ const failureSpecs = new Map<AppErrorClass, FailureSpec>([
 	],
 	[ConfigError, { code: "CONFIG_ERROR", hint: "run housing-ops validate" }],
 	[
-		StoreNotInitializedError,
-		{ code: "WORKSPACE_NOT_INITIALIZED", hint: "run housing-ops setup" },
+		ConfigNotFoundError,
+		{ code: "CONFIG_NOT_FOUND", hint: "run housing-ops init" },
 	],
 	[
-		WorkspaceExistsError,
+		StoreNotInitializedError,
+		{ code: "WORKSPACE_NOT_INITIALIZED", hint: "run housing-ops init" },
+	],
+	[
+		InstanceExistsError,
 		{
-			code: "WORKSPACE_EXISTS",
-			hint: "pass --force to overwrite, or run housing-ops validate",
+			code: "INSTANCE_EXISTS",
+			hint: "pass --force to replace instance.yml",
 		},
 	],
 ]);

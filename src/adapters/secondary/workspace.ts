@@ -2,17 +2,12 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import yaml from "js-yaml";
+import type { StoreDescription } from "../../core/ports/store.port.js";
 import {
-	CONFIG_FILES,
 	ExtensionApprovalSchema,
 	ExtensionsFileSchema,
 } from "../../core/schemas/index.js";
-import type { ConfigFile } from "../../core/schemas/index.js";
-import type { Profile } from "../../core/schemas/profile.js";
-import { WorkspaceExistsError } from "../../core/errors/setup.js";
-import type { StoreDescription } from "../../core/ports/store.port.js";
-import type { WorkspacePlan } from "../../core/services/setup.service.js";
-import type { WorkspaceInput } from "../../core/services/validate.service.js";
+import { instancePath } from "./instance.js";
 
 /** Workspace locations. The root is the repo checkout or HOUSING_OPS_ROOT. */
 export function resolveRoot(): string {
@@ -26,54 +21,32 @@ export interface WorkspaceReadRequest {
 	expectedSchemaVersion: number;
 }
 
-/** Reads every file validation needs and pairs it with the store's self-description. */
-export function readWorkspace(request: WorkspaceReadRequest): WorkspaceInput {
+/** The files validation reads, paired with the store's self-description. */
+export interface WorkspaceFiles {
+	instanceText: string | null;
+	extensionsText: string | null;
+	currentHashes: Record<string, string | null>;
+	store: StoreDescription;
+	expectedSchemaVersion: number;
+}
+
+/** Reads the instance file and the CLI extension manifest. The store supplies the rest. */
+export function readWorkspaceFiles(
+	request: WorkspaceReadRequest,
+): WorkspaceFiles {
 	const { root, store, expectedSchemaVersion } = request;
-	const extensionsText = readText(configPath(root, "extensions.yml"));
+	const extensionsText = readText(extensionsPath(root));
 	return {
-		configTexts: readConfigs(root),
+		instanceText: readText(instancePath(root)),
+		extensionsText,
 		currentHashes: readCurrentHashes(root, extensionsText),
 		store,
 		expectedSchemaVersion,
 	};
 }
 
-function configPath(root: string, file: ConfigFile): string {
-	return path.join(root, "config", file);
-}
-
-/** Writes profile.yml: the validated profile plus its version tag. */
-export function writeProfile(root: string, profile: Profile): void {
-	fs.writeFileSync(
-		configPath(root, "profile.yml"),
-		yaml.dump({ ...profile, version: 1 }),
-		"utf8",
-	);
-}
-
-/** Writes the five config documents under `config/`. Refuses an existing profile unless forced. */
-export function writeWorkspace(
-	root: string,
-	plan: WorkspacePlan,
-	force = false,
-): void {
-	if (!force && fs.existsSync(configPath(root, "profile.yml"))) {
-		throw new WorkspaceExistsError(root);
-	}
-	fs.mkdirSync(path.join(root, "config"), { recursive: true });
-	for (const file of CONFIG_FILES) {
-		fs.writeFileSync(configPath(root, file), yaml.dump(plan[file]), "utf8");
-	}
-}
-
-function readConfigs(root: string): Record<ConfigFile, string | null> {
-	return {
-		"profile.yml": readText(configPath(root, "profile.yml")),
-		"pipeline.yml": readText(configPath(root, "pipeline.yml")),
-		"providers.yml": readText(configPath(root, "providers.yml")),
-		"publishers.yml": readText(configPath(root, "publishers.yml")),
-		"extensions.yml": readText(configPath(root, "extensions.yml")),
-	};
+function extensionsPath(root: string): string {
+	return path.join(root, "config", "extensions.yml");
 }
 
 function readText(filePath: string): string | null {

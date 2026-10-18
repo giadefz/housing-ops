@@ -1,35 +1,9 @@
+import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { storeFactory } from "../src/adapters/secondary/store-factory.js";
-import { initDatabase } from "../src/adapters/secondary/storage/sqlite/init.js";
-import { SCHEMA_VERSION } from "../src/adapters/secondary/storage/sqlite/migrate.js";
-import {
-	readWorkspace,
-	writeWorkspace,
-} from "../src/adapters/secondary/workspace.js";
-import { CONFIG_FILES, SetupInputSchema } from "../src/core/schemas/index.js";
-import { planWorkspace } from "../src/core/services/setup.service.js";
-import { validateWorkspace } from "../src/core/services/validate.service.js";
-
-const documents = {
-	"profile.yml": {
-		version: 1,
-		market: "rent",
-		country: "ie",
-		budget: { max: 2200, currency: "EUR" },
-	},
-	"pipeline.yml": {
-		version: 1,
-		filters: [{ id: "budget", enabled: true, missing: "skip" }],
-	},
-	"providers.yml": { version: 1, providers: [] },
-	"publishers.yml": { version: 1, publishers: [] },
-	"extensions.yml": { version: 1, approvals: [] },
-};
-
-const plan = planWorkspace(SetupInputSchema.parse(documents));
+import { readWorkspaceFiles } from "../src/adapters/secondary/workspace.js";
 
 let roots: string[] = [];
 afterEach(() => {
@@ -44,48 +18,68 @@ function emptyRoot(): string {
 }
 
 function read(root: string) {
-	return readWorkspace({
+	return readWorkspaceFiles({
 		root,
-		store: storeFactory.describe(root),
-		expectedSchemaVersion: storeFactory.targetSchemaVersion,
+		store: { location: "data/housing.db", schemaVersion: null },
+		expectedSchemaVersion: 1,
 	});
 }
 
-describe("writeWorkspace", () => {
-	it("writes all five config documents under config/", () => {
-		const root = emptyRoot();
-		writeWorkspace(root, plan);
-		for (const file of CONFIG_FILES) {
-			expect(fs.existsSync(path.join(root, "config", file))).toBe(true);
-		}
-		const workspace = read(root);
-		for (const file of CONFIG_FILES) {
-			expect(workspace.configTexts[file]).not.toBeNull();
-		}
-	});
-});
+function writeInstance(root: string): void {
+	fs.writeFileSync(
+		path.join(root, "instance.yml"),
+		"version: 1\nname: Home\ncountry: ie\nmarket: rent\n",
+	);
+}
 
-describe("initDatabase", () => {
-	it("creates the database at the workspace schema version", () => {
-		const root = emptyRoot();
-		initDatabase(root);
-		const workspace = read(root);
-		expect(workspace.store.schemaVersion).toBe(SCHEMA_VERSION);
+function writeExtensions(root: string, file: string, sha256: string): void {
+	fs.mkdirSync(path.join(root, "config"), { recursive: true });
+	fs.writeFileSync(
+		path.join(root, "config", "extensions.yml"),
+		[
+			"version: 1",
+			"approvals:",
+			"  - id: garden",
+			"    kind: filter",
+			`    path: ${file}`,
+			`    sha256: ${sha256}`,
+			"    approved_at: 2026-10-04",
+			"",
+		].join("\n"),
+	);
+}
+
+describe("readWorkspaceFiles", () => {
+	it("returns nulls on an empty workspace", () => {
+		const files = read(emptyRoot());
+		expect(files.instanceText).toBeNull();
+		expect(files.extensionsText).toBeNull();
+		expect(files.currentHashes).toEqual({});
 	});
 
-	it("is idempotent", () => {
+	it("reads instance.yml as text", () => {
 		const root = emptyRoot();
-		initDatabase(root);
-		expect(() => initDatabase(root)).not.toThrow();
+		writeInstance(root);
+		expect(read(root).instanceText).toContain("name: Home");
 	});
-});
 
-describe("setup end state", () => {
-	it("leaves a workspace that validates all green", () => {
+	it("hashes approved extension files", () => {
 		const root = emptyRoot();
-		writeWorkspace(root, plan);
-		initDatabase(root);
-		const findings = validateWorkspace(read(root)).findings;
-		expect(findings.filter((finding) => !finding.ok)).toEqual([]);
+		const file = "filters.local/garden.ts";
+		const content = "export const garden = 1;\n";
+		fs.mkdirSync(path.join(root, "filters.local"), { recursive: true });
+		fs.writeFileSync(path.join(root, file), content);
+		const sha256 = crypto
+			.createHash("sha256")
+			.update(content)
+			.digest("hex");
+		writeExtensions(root, file, sha256);
+		expect(read(root).currentHashes[file]).toBe(sha256);
+	});
+
+	it("reports null for a missing approved file", () => {
+		const root = emptyRoot();
+		writeExtensions(root, "filters.local/missing.ts", "abc123");
+		expect(read(root).currentHashes["filters.local/missing.ts"]).toBeNull();
 	});
 });

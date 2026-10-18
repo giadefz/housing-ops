@@ -6,7 +6,9 @@ import type { Offer } from "../domain/offer.js";
 import type { PipelineEvent } from "../domain/events.js";
 import type { Verdict } from "../domain/verdict.js";
 import type { Profile } from "../schemas/profile.js";
-import type { ConfigFile, SetupInput } from "../schemas/index.js";
+import type { Instance } from "../schemas/instance.js";
+import type { Config } from "../schemas/config.js";
+import type { InitInput } from "../schemas/init.js";
 import type {
 	InteractionInput,
 	ProfileGetInput,
@@ -106,7 +108,7 @@ export interface ScanQuery {
 	providerId?: string;
 }
 
-/** One configured provider, as listed from providers.yml. */
+/** One configured provider, as listed from the config. */
 export interface ProviderSummary {
 	id: string;
 	type: string;
@@ -190,7 +192,7 @@ export interface PublishResult {
 	published: number;
 }
 
-/** One configured filter, as listed from pipeline.yml. */
+/** One configured filter, as listed from the config. */
 export interface FilterSummary {
 	id: string;
 	enabled: boolean;
@@ -214,17 +216,35 @@ export interface FilterCheckResult {
 	examples: FilterCheckExample[];
 }
 
-/** The result of setting up a workspace: the files written and the database path. */
-export interface SetupResult {
-	files: ConfigFile[];
+/** A request to read a member's profile, optionally at a dotted path. */
+export interface ProfileGetQuery extends ProfileGetInput {
+	memberId: string;
+}
+
+/** A request to set one dotted path on a member's profile. */
+export interface ProfileSetQuery extends ProfileSetInput {
+	memberId: string;
+}
+
+/** The result of initializing an instance: its deployment identity and database path. */
+export interface InitResult {
+	instance: Instance;
 	database: string;
+}
+
+/** A request to initialize an instance. */
+export interface InitCommand {
+	input: InitInput;
+	force: boolean;
 }
 
 /** The use-case surface every inbound (primary) adapter drives. Inbound adapters depend on this alone. */
 export interface ApplicationPort {
 	getVersion(): VersionInfo;
 	validateWorkspace(): ValidationReport;
-	setup(input: SetupInput, force: boolean): SetupResult;
+	init(request: InitCommand): Promise<InitResult>;
+	getConfig(): Promise<Config>;
+	setConfig(config: Config): Promise<Config>;
 	getOffer(input: OfferQuery): Promise<OfferDetail>;
 	listProviders(): ProviderSummary[];
 	listFilters(): FilterSummary[];
@@ -237,8 +257,8 @@ export interface ApplicationPort {
 	emptyFeed(input: MemberQuery): Promise<FeedStatus>;
 	setVerdict(input: VerdictCommand): Promise<VerdictResult>;
 	interact(input: InteractionCommand): Promise<InteractionResult>;
-	getProfile(input: ProfileGetInput): ProfileValueResult;
-	setProfile(input: ProfileSetInput): ProfileSetResult;
+	getProfile(input: ProfileGetQuery): Promise<ProfileValueResult>;
+	setProfile(input: ProfileSetQuery): Promise<ProfileSetResult>;
 	getDigest(input: DigestQuery): Promise<DigestResult>;
 	publishNow(input: PublishQuery): Promise<PublishResult>;
 }

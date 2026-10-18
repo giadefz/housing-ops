@@ -65,11 +65,3 @@ export const ConfigSchemas: Record<ConfigFile, z.ZodType> = {
 	"publishers.yml": PublishersFileSchema,
 	"extensions.yml": BaseConfig,
 };
-
-/** A setup request: the five config documents, each preformatted by the caller. */
-export const SetupInputSchema = z.object(
-	Object.fromEntries(CONFIG_FILES.map((file) => [file, z.unknown()])),
-);
-
-/** The parsed setup request. */
-export type SetupInput = z.infer<typeof SetupInputSchema>;

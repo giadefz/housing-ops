@@ -5,6 +5,7 @@ import type {
 	StoredOfferDetail,
 } from "../../../../core/ports/store.port.js";
 import { listAnalyses, recordAnalysis } from "./analysis.js";
+import { readConfig, writeConfig } from "./config.js";
 import {
 	findDecision,
 	listDecisionsForOffer,
@@ -34,6 +35,7 @@ import {
 	saveFeedCursor,
 } from "./feed-cursor.js";
 import { listInteractions, recordInteraction } from "./interaction.js";
+import { readMemberProfile, writeMemberProfile } from "./member-profile.js";
 import { recordMarketOutcome } from "./market-event.js";
 import { migrate } from "./migrate.js";
 import {
@@ -66,6 +68,12 @@ export function createSqliteStore(database: Database.Database): OfferStorePort {
 		findDwellingByAddressKey: (addressKey) =>
 			findDwellingByAddressKey(database, addressKey),
 		saveOffer: (offer) => saveOffer(database, offer),
+		readConfig: async () => readConfig(database),
+		writeConfig: (config) => writeConfig(database, config),
+		readMemberProfile: async (memberId) =>
+			readMemberProfile(database, memberId),
+		writeMemberProfile: (memberId, profile) =>
+			writeMemberProfile(database, memberId, profile),
 		addToPool: (offerId, enteredAt) =>
 			addToPool(database, offerId, enteredAt),
 		addToFeed: (entry) => addToFeed(database, entry),

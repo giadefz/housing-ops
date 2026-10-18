@@ -8,7 +8,7 @@ import {
 } from "../../../core/schemas/index.js";
 import { createProcessPublisher } from "./process-publisher.js";
 
-/** Builds the enabled publishers from the publishers.yml text. An invalid file throws. */
+/** Builds the enabled publishers from the publishers config text. An invalid file throws. */
 export function buildPublishers(
 	publishersText: string | null,
 ): PublisherPort[] {
@@ -17,7 +17,7 @@ export function buildPublishers(
 		.map((entry) => createProcessPublisher(entry));
 }
 
-/** Parses publishers.yml into its entries. An invalid file throws. */
+/** Parses the publishers config into its entries. An invalid file throws. */
 export function parsePublishers(
 	publishersText: string | null,
 ): PublisherEntry[] {
@@ -25,7 +25,7 @@ export function parsePublishers(
 	const parsed = PublishersFileSchema.safeParse(loadYaml(publishersText));
 	if (!parsed.success) {
 		throw new ConfigError(
-			`publishers.yml: ${parsed.error.message}`,
+			`config.publishers: ${parsed.error.message}`,
 			parsed.error,
 		);
 	}
@@ -36,6 +36,9 @@ function loadYaml(text: string): unknown {
 	try {
 		return yaml.load(text);
 	} catch (error) {
-		throw new ConfigError(`publishers.yml: ${errorMessage(error)}`, error);
+		throw new ConfigError(
+			`config.publishers: ${errorMessage(error)}`,
+			error,
+		);
 	}
 }

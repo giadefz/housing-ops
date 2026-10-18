@@ -9,7 +9,7 @@ import {
 } from "../../../core/schemas/index.js";
 import { createProcessAdapter } from "./process-adapter.js";
 
-/** Builds providers from the providers.yml text, keyed by id. An invalid file throws. */
+/** Builds providers from the providers config text, keyed by id. An invalid file throws. */
 export function buildProviders(
 	providersText: string | null,
 ): Map<string, ProviderPort> {
@@ -21,7 +21,7 @@ export function buildProviders(
 	return providers;
 }
 
-/** Lists the configured providers, as written in providers.yml. */
+/** Lists the configured providers, as written in the providers config. */
 export function listProviderSummaries(
 	providersText: string | null,
 ): ProviderSummary[] {
@@ -43,7 +43,7 @@ function parseProviders(providersText: string): ProviderEntry[] {
 	const parsed = ProvidersFileSchema.safeParse(loadYaml(providersText));
 	if (!parsed.success) {
 		throw new ConfigError(
-			`providers.yml: ${parsed.error.message}`,
+			`config.providers: ${parsed.error.message}`,
 			parsed.error,
 		);
 	}
@@ -54,6 +54,9 @@ function loadYaml(text: string): unknown {
 	try {
 		return yaml.load(text);
 	} catch (error) {
-		throw new ConfigError(`providers.yml: ${errorMessage(error)}`, error);
+		throw new ConfigError(
+			`config.providers: ${errorMessage(error)}`,
+			error,
+		);
 	}
 }

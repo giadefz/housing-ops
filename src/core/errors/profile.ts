@@ -15,3 +15,13 @@ export class InvalidProfileValueError extends AppError {
 		this.name = "InvalidProfileValueError";
 	}
 }
+
+/** Thrown when a member has no profile yet. */
+export class ProfileNotFoundError extends AppError {
+	constructor(memberId: string) {
+		super(
+			`profile not initialized for member ${memberId} — run housing-ops init`,
+		);
+		this.name = "ProfileNotFoundError";
+	}
+}

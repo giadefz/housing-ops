@@ -62,6 +62,7 @@ describe("migrate", () => {
 		expect(tableNames(file)).toEqual([
 			"_migrations",
 			"analyses",
+			"config",
 			"dead_letter",
 			"decisions",
 			"dwellings",
@@ -69,6 +70,7 @@ describe("migrate", () => {
 			"feed_cursor",
 			"interactions",
 			"market_events",
+			"member_profiles",
 			"members",
 			"offer_versions",
 			"offers",

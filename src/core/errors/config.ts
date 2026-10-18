@@ -7,3 +7,11 @@ export class ConfigError extends AppError {
 		this.name = "ConfigError";
 	}
 }
+
+/** Thrown when the store has no shared config yet. */
+export class ConfigNotFoundError extends AppError {
+	constructor() {
+		super("config not initialized — run housing-ops init");
+		this.name = "ConfigNotFoundError";
+	}
+}

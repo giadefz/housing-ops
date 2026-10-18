@@ -1,36 +1,41 @@
 import yaml from "js-yaml";
-import {
-	CONFIG_FILES,
-	ConfigSchemas,
-	ExtensionApprovalSchema,
-	ExtensionsFileSchema,
-	type ConfigFile,
-	type ExtensionApproval,
-} from "../schemas/index.js";
 import { errorMessage } from "../errors/message.js";
-import { API_VERSION } from "../version.js";
 import type { Finding, ValidationReport } from "../ports/application.port.js";
 import type { StoreDescription } from "../ports/store.port.js";
+import type { Config } from "../schemas/config.js";
+import {
+	ExtensionApprovalSchema,
+	ExtensionsFileSchema,
+	type ExtensionApproval,
+} from "../schemas/index.js";
+import { InstanceSchema } from "../schemas/instance.js";
+import type { Profile } from "../schemas/profile.js";
+import { API_VERSION } from "../version.js";
 
-/** Everything validation reads: raw config texts, current file hashes, the store's self-description, and the schema core expects. */
+/** Everything validation reads: the instance file, the store config and admin profile, and the extension manifest. */
 export interface WorkspaceInput {
-	configTexts: Record<ConfigFile, string | null>;
+	instanceText: string | null;
+	config: Config | null;
+	profile: Profile | null;
+	configError?: string;
+	profileError?: string;
+	extensionsText: string | null;
 	currentHashes: Record<string, string | null>;
 	store: StoreDescription;
 	expectedSchemaVersion: number;
 }
 
-const SETUP_HINT = "run housing-ops setup";
+const INIT_HINT = "run housing-ops init";
 
-/** Checks a workspace snapshot for config, approval, database, schema, and version problems. Pure: reads nothing, every input arrives in WorkspaceInput. */
+/** Checks an instance snapshot for config, approval, database, schema, and version problems. Pure. */
 export function validateWorkspace(input: WorkspaceInput): ValidationReport {
 	return {
 		findings: [
-			...validateConfigs(input.configTexts),
-			...verifyApprovals(
-				input.configTexts["extensions.yml"],
-				input.currentHashes,
-			),
+			validateInstance(input.instanceText),
+			validateStoreConfig(input.config, input.configError),
+			validateStoreProfile(input.profile, input.profileError),
+			...verifyApprovals(input.extensionsText, input.currentHashes),
+			...checkIdentity(input),
 			checkDatabase(input.store),
 			checkSchemaVersion(input),
 			checkApiVersion(),
@@ -38,29 +43,63 @@ export function validateWorkspace(input: WorkspaceInput): ValidationReport {
 	};
 }
 
-function validateConfigs(texts: Record<ConfigFile, string | null>): Finding[] {
-	return CONFIG_FILES.map((file) => validateConfig(file, texts[file]));
-}
-
-function validateConfig(file: ConfigFile, text: string | null): Finding {
-	if (text === null) return missingConfig(file);
+function validateInstance(text: string | null): Finding {
+	if (text === null) return missing("config.instance");
 	const parsed = parseYaml(text);
-	if (!parsed.ok) return invalidConfig(file, parsed.error);
-	const checked = ConfigSchemas[file].safeParse(parsed.data);
-	if (!checked.success) return invalidConfig(file, checked.error.message);
-	return { name: `config.${file}`, ok: true };
+	if (!parsed.ok) return invalid("config.instance", parsed.error);
+	const checked = InstanceSchema.safeParse(parsed.data);
+	if (!checked.success)
+		return invalid("config.instance", checked.error.message);
+	return { name: "config.instance", ok: true };
 }
 
-function missingConfig(file: ConfigFile): Finding {
-	return {
-		name: `config.${file}`,
-		ok: false,
-		detail: `missing — ${SETUP_HINT}`,
-	};
+function validateStoreConfig(
+	config: Config | null,
+	error: string | undefined,
+): Finding {
+	if (error !== undefined)
+		return { name: "config.store", ok: false, detail: `corrupt: ${error}` };
+	if (config === null) return missing("config.store");
+	return { name: "config.store", ok: true };
 }
 
-function invalidConfig(file: ConfigFile, reason: string): Finding {
-	return { name: `config.${file}`, ok: false, detail: `invalid: ${reason}` };
+function validateStoreProfile(
+	profile: Profile | null,
+	error: string | undefined,
+): Finding {
+	if (error !== undefined)
+		return { name: "profile", ok: false, detail: `corrupt: ${error}` };
+	if (profile === null) return missing("profile");
+	return { name: "profile", ok: true };
+}
+
+function missing(name: string): Finding {
+	return { name, ok: false, detail: `missing — ${INIT_HINT}` };
+}
+
+function invalid(name: string, reason: string): Finding {
+	return { name, ok: false, detail: `invalid: ${reason}` };
+}
+
+function checkIdentity(input: WorkspaceInput): Finding[] {
+	if (input.instanceText === null || input.profile === null) return [];
+	const parsed = parseYaml(input.instanceText);
+	if (!parsed.ok) return [];
+	const instance = InstanceSchema.safeParse(parsed.data);
+	if (!instance.success) return [];
+	const mismatches: string[] = [];
+	if (instance.data.country !== input.profile.country)
+		mismatches.push("country");
+	if (instance.data.market !== input.profile.market)
+		mismatches.push("market");
+	if (mismatches.length === 0) return [{ name: "identity", ok: true }];
+	return [
+		{
+			name: "identity",
+			ok: false,
+			detail: `instance.yml and the admin profile disagree on ${mismatches.join(", ")}`,
+		},
+	];
 }
 
 function parseYaml(
@@ -149,7 +188,7 @@ function verifyApprovalFile(
 function checkDatabase(store: StoreDescription): Finding {
 	if (store.schemaVersion !== null)
 		return { name: "db", ok: true, detail: `${store.location} present` };
-	return { name: "db", ok: false, detail: `not initialized — ${SETUP_HINT}` };
+	return { name: "db", ok: false, detail: `not initialized — ${INIT_HINT}` };
 }
 
 function checkApiVersion(): Finding {

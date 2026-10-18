@@ -1,21 +1,50 @@
 import { describe, expect, it } from "vitest";
+import type { Config } from "../src/core/schemas/config.js";
+import type { Profile } from "../src/core/schemas/profile.js";
 import {
 	validateWorkspace,
 	type WorkspaceInput,
 } from "../src/core/services/validate.service.js";
 
+const instanceText = [
+	"version: 1",
+	"name: Home",
+	"country: ie",
+	"market: rent",
+	"",
+].join("\n");
+
 function emptyInput(): WorkspaceInput {
 	return {
-		configTexts: {
-			"profile.yml": null,
-			"pipeline.yml": null,
-			"providers.yml": null,
-			"publishers.yml": null,
-			"extensions.yml": null,
-		},
+		instanceText: null,
+		config: null,
+		profile: null,
+		extensionsText: null,
 		currentHashes: {},
 		store: { location: "data/housing.db", schemaVersion: null },
 		expectedSchemaVersion: 1,
+	};
+}
+
+function configFixture(): Config {
+	return {
+		pipeline: {
+			version: 1,
+			filters: [{ id: "budget", enabled: true, missing: "skip" }],
+		},
+		providers: { version: 1, providers: [] },
+		publishers: { version: 1, publishers: [] },
+	};
+}
+
+function profileFixture(): Profile {
+	return {
+		market: "rent",
+		country: "ie",
+		budget: { max: 2200, currency: "EUR" },
+		areas: ["Dublin 8"],
+		gate: true,
+		recheckHours: 48,
 	};
 }
 
@@ -24,76 +53,105 @@ function inputWithExtensions(
 	currentHashes: Record<string, string | null>,
 ): WorkspaceInput {
 	const input = emptyInput();
-	input.configTexts["extensions.yml"] = extensionsText;
+	input.extensionsText = extensionsText;
 	input.currentHashes = currentHashes;
 	return input;
 }
 
 describe("validate on empty workspace", () => {
-	it("fails every config check gracefully without throwing", () => {
+	it("fails instance, config, and profile checks with an init hint", () => {
 		const report = validateWorkspace(emptyInput());
 		const byName = Object.fromEntries(
 			report.findings.map((finding) => [finding.name, finding]),
 		);
-		for (const file of [
-			"profile.yml",
-			"pipeline.yml",
-			"providers.yml",
-			"publishers.yml",
-			"extensions.yml",
-		]) {
-			expect(byName[`config.${file}`].ok).toBe(false);
-			expect(byName[`config.${file}`].detail).toMatch(/setup/);
+		for (const name of ["config.instance", "config.store", "profile"]) {
+			expect(byName[name]?.ok).toBe(false);
+			expect(byName[name]?.detail).toMatch(/init/);
 		}
-		expect(byName["db"].ok).toBe(false);
-		expect(byName["api"].ok).toBe(true);
+		expect(byName["db"]?.ok).toBe(false);
+		expect(byName["api"]?.ok).toBe(true);
 	});
-	it("passes a present valid config file", () => {
+
+	it("passes a valid instance file", () => {
 		const input = emptyInput();
-		input.configTexts["profile.yml"] =
-			"version: 1\nmarket: rent\ncountry: ie\nbudget:\n  max: 2200\n  currency: EUR\n";
-		const report = validateWorkspace(input);
-		const finding = report.findings.find(
-			(candidate) => candidate.name === "config.profile.yml",
+		input.instanceText = instanceText;
+		const finding = validateWorkspace(input).findings.find(
+			(candidate) => candidate.name === "config.instance",
 		);
 		expect(finding?.ok).toBe(true);
 	});
-	it("fails an invalid config file with the reason", () => {
+
+	it("fails an invalid instance file with the reason", () => {
 		const input = emptyInput();
-		input.configTexts["profile.yml"] = "version: 2\n";
-		const report = validateWorkspace(input);
-		const finding = report.findings.find(
-			(candidate) => candidate.name === "config.profile.yml",
+		input.instanceText = "version: 2\n";
+		const finding = validateWorkspace(input).findings.find(
+			(candidate) => candidate.name === "config.instance",
 		);
 		expect(finding?.ok).toBe(false);
 		expect(finding?.detail).toMatch(/invalid/);
 	});
-	it("fails an unparseable config file with the reason", () => {
+
+	it("passes a present store config", () => {
 		const input = emptyInput();
-		input.configTexts["profile.yml"] = "version: [unclosed\n";
-		const report = validateWorkspace(input);
-		const finding = report.findings.find(
-			(candidate) => candidate.name === "config.profile.yml",
-		);
-		expect(finding?.ok).toBe(false);
-		expect(finding?.detail).toMatch(/invalid/);
-	});
-	it("passes a valid publishers.yml", () => {
-		const input = emptyInput();
-		input.configTexts["publishers.yml"] = "version: 1\npublishers: []\n";
+		input.config = configFixture();
 		const finding = validateWorkspace(input).findings.find(
-			(candidate) => candidate.name === "config.publishers.yml",
+			(candidate) => candidate.name === "config.store",
 		);
 		expect(finding?.ok).toBe(true);
 	});
-	it("fails a malformed publisher entry", () => {
+
+	it("passes a present admin profile", () => {
 		const input = emptyInput();
-		input.configTexts["publishers.yml"] =
-			"version: 1\npublishers:\n  - id: hook\n    type: webhook\n";
+		input.profile = profileFixture();
 		const finding = validateWorkspace(input).findings.find(
-			(candidate) => candidate.name === "config.publishers.yml",
+			(candidate) => candidate.name === "profile",
+		);
+		expect(finding?.ok).toBe(true);
+	});
+
+	it("flags an identity mismatch between the instance and profile", () => {
+		const input = emptyInput();
+		input.instanceText = instanceText;
+		input.profile = { ...profileFixture(), country: "fr" };
+		const finding = validateWorkspace(input).findings.find(
+			(candidate) => candidate.name === "identity",
 		);
 		expect(finding?.ok).toBe(false);
+		expect(finding?.detail).toMatch(/country/);
+	});
+
+	it("flags a market mismatch between the instance and profile", () => {
+		const input = emptyInput();
+		input.instanceText = instanceText.replace(
+			"market: rent",
+			"market: buy",
+		);
+		input.profile = profileFixture();
+		const finding = validateWorkspace(input).findings.find(
+			(candidate) => candidate.name === "identity",
+		);
+		expect(finding?.ok).toBe(false);
+		expect(finding?.detail).toMatch(/market/);
+	});
+
+	it("reports a corrupt store config", () => {
+		const input = emptyInput();
+		input.configError = "bad json";
+		const finding = validateWorkspace(input).findings.find(
+			(candidate) => candidate.name === "config.store",
+		);
+		expect(finding?.ok).toBe(false);
+		expect(finding?.detail).toMatch(/corrupt/);
+	});
+
+	it("reports a corrupt admin profile", () => {
+		const input = emptyInput();
+		input.profileError = "bad json";
+		const finding = validateWorkspace(input).findings.find(
+			(candidate) => candidate.name === "profile",
+		);
+		expect(finding?.ok).toBe(false);
+		expect(finding?.detail).toMatch(/corrupt/);
 	});
 });
 

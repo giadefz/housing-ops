@@ -3,12 +3,17 @@ import os from "node:os";
 import path from "node:path";
 import type Database from "better-sqlite3";
 import { afterEach, describe, expect, it } from "vitest";
+import { writeInstance } from "../src/adapters/secondary/instance.js";
 import { findOfferByListing } from "../src/adapters/secondary/storage/sqlite/offer.js";
 import {
 	closeStore,
+	createSqliteStore,
 	openStore,
 } from "../src/adapters/secondary/storage/sqlite/store.js";
 import { DEFAULT_MEMBER_ID } from "../src/core/domain/member.js";
+import type { Config } from "../src/core/schemas/config.js";
+import type { Instance } from "../src/core/schemas/instance.js";
+import type { Profile } from "../src/core/schemas/profile.js";
 import { createDefaultApplication } from "../src/defaults.js";
 
 let roots: string[] = [];
@@ -31,28 +36,7 @@ async function feedState(
 	return row?.state;
 }
 
-const profileYaml = [
-	"version: 1",
-	"market: rent",
-	"country: ie",
-	"budget:",
-	"  max: 2200",
-	"  currency: EUR",
-	'areas: ["Dublin 8"]',
-	"gate: false",
-	"",
-].join("\n");
-
-const pipelineYaml = [
-	"version: 1",
-	"filters:",
-	"  - id: budget",
-	"    enabled: true",
-	"    missing: fail",
-	"",
-].join("\n");
-
-const listings = JSON.stringify([
+const listings = [
 	{
 		listing_id: "cheap",
 		url: "https://example.invalid/cheap",
@@ -70,50 +54,79 @@ const listings = JSON.stringify([
 		extra: { ber: "B", eircode: "D08X2" },
 	},
 	{ listing_id: "bad" },
-]);
+];
 
-const providersYaml = [
-	"version: 1",
-	"providers:",
-	"  - id: fake",
-	"    type: process",
-	"    country: ie",
-	"    markets: [rent]",
-	"    command: node",
-	'    args: ["-e", "process.stdout.write(process.env.PAYLOAD ?? \'\')"]',
-	"    env:",
-	`      PAYLOAD: '${listings}'`,
-	"    output: json",
-	"",
-].join("\n");
+function instanceFixture(): Instance {
+	return {
+		version: 1,
+		name: "Home",
+		country: "ie",
+		market: "rent",
+		interfaces: ["cli"],
+	};
+}
+
+function profileFixture(): Profile {
+	return {
+		market: "rent",
+		country: "ie",
+		budget: { max: 2200, currency: "EUR" },
+		areas: ["Dublin 8"],
+		gate: false,
+		recheckHours: 48,
+	};
+}
+
+function configFixture(): Config {
+	return {
+		pipeline: {
+			version: 1,
+			filters: [{ id: "budget", enabled: true, missing: "fail" }],
+		},
+		providers: {
+			version: 1,
+			providers: [
+				{
+					id: "fake",
+					type: "process",
+					country: "ie",
+					markets: ["rent"],
+					enabled: true,
+					command: "node",
+					args: [
+						"-e",
+						"process.stdout.write(process.env.PAYLOAD ?? '')",
+					],
+					env: { PAYLOAD: JSON.stringify(listings) },
+					output: "json",
+				},
+			],
+		},
+		publishers: { version: 1, publishers: [] },
+	};
+}
 
 interface Workspace {
 	root: string;
 	database: Database.Database;
 }
 
-function workspace(): Workspace {
+async function workspace(): Promise<Workspace> {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), "housing-ops-"));
 	roots.push(root);
-	fs.mkdirSync(path.join(root, "config"), { recursive: true });
 	fs.mkdirSync(path.join(root, "data"), { recursive: true });
+	writeInstance(root, instanceFixture());
 	const database = openStore(path.join(root, "data", "housing.db"));
+	const store = createSqliteStore(database);
+	await store.writeConfig(configFixture());
+	await store.writeMemberProfile(MEMBER, profileFixture());
 	closeStore(database);
-	writeConfig(root, "profile.yml", profileYaml);
-	writeConfig(root, "pipeline.yml", pipelineYaml);
-	writeConfig(root, "providers.yml", providersYaml);
-	writeConfig(root, "publishers.yml", "version: 1\n");
-	writeConfig(root, "extensions.yml", "version: 1\n");
 	return { root, database: openStore(path.join(root, "data", "housing.db")) };
-}
-
-function writeConfig(root: string, file: string, content: string): void {
-	fs.writeFileSync(path.join(root, "config", file), content);
 }
 
 describe("end to end", () => {
 	it("validates, scans a process provider, filters, stores, and reads back", async () => {
-		const { root, database } = workspace();
+		const { root, database } = await workspace();
 		try {
 			const app = await createDefaultApplication(root);
 

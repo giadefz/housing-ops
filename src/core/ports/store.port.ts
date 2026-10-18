@@ -10,6 +10,8 @@ import type { FeedCursor, FeedEntry } from "../domain/feed.js";
 import type { Offer } from "../domain/offer.js";
 import type { QueueView } from "../domain/queue.js";
 import type { Verdict } from "../domain/verdict.js";
+import type { Config } from "../schemas/config.js";
+import type { Profile } from "../schemas/profile.js";
 
 /** An offer together with one member's standing on it. */
 export interface MemberOffer {
@@ -128,6 +130,10 @@ export interface OfferStorePort {
 	saveDwelling(dwelling: Dwelling): Promise<void>;
 	findDwellingByAddressKey(addressKey: string): Promise<Dwelling | null>;
 	saveOffer(offer: Offer): Promise<void>;
+	readConfig(): Promise<Config | null>;
+	writeConfig(config: Config): Promise<void>;
+	readMemberProfile(memberId: string): Promise<Profile | null>;
+	writeMemberProfile(memberId: string, profile: Profile): Promise<void>;
 	addToPool(offerId: string, enteredAt: string): Promise<string>;
 	addToFeed(entry: FeedEntry): Promise<void>;
 	findFeedEntry(memberId: string, offerId: string): Promise<FeedEntry | null>;

@@ -73,7 +73,7 @@ function parseStages(pipelineText: string | null): FilterStageConfig[] {
 	const parsed = PipelineFileSchema.safeParse(loadYaml(pipelineText));
 	if (!parsed.success) {
 		throw new ConfigError(
-			`pipeline.yml: ${parsed.error.message}`,
+			`config.pipeline: ${parsed.error.message}`,
 			parsed.error,
 		);
 	}
@@ -84,6 +84,6 @@ function loadYaml(text: string): unknown {
 	try {
 		return yaml.load(text);
 	} catch (error) {
-		throw new ConfigError(`pipeline.yml: ${errorMessage(error)}`, error);
+		throw new ConfigError(`config.pipeline: ${errorMessage(error)}`, error);
 	}
 }

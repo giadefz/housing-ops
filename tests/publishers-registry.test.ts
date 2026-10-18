@@ -28,6 +28,6 @@ describe("parsePublishers", () => {
 	it("throws on an invalid file", () => {
 		expect(() =>
 			parsePublishers("version: 1\npublishers:\n  - id: x\n"),
-		).toThrow(/publishers.yml/);
+		).toThrow(/config.publishers/);
 	});
 });
