@@ -19,6 +19,7 @@ function emptyInput(): WorkspaceInput {
 		instanceText: null,
 		config: null,
 		profile: null,
+		members: [],
 		extensionsText: null,
 		currentHashes: {},
 		store: { location: "data/housing.db", schemaVersion: null },
@@ -152,6 +153,46 @@ describe("validate on empty workspace", () => {
 		);
 		expect(finding?.ok).toBe(false);
 		expect(finding?.detail).toMatch(/corrupt/);
+	});
+
+	it("flags a member without a profile", () => {
+		const input = emptyInput();
+		input.members = [{ memberId: "bob", profile: null }];
+		const finding = validateWorkspace(input).findings.find(
+			(candidate) => candidate.name === "profile.bob",
+		);
+		expect(finding?.ok).toBe(false);
+		expect(finding?.detail).toMatch(/init/);
+	});
+
+	it("flags a member profile whose identity mismatches", () => {
+		const input = emptyInput();
+		input.instanceText = instanceText;
+		input.members = [
+			{
+				memberId: "bob",
+				profile: { ...profileFixture(), country: "fr" },
+			},
+		];
+		const finding = validateWorkspace(input).findings.find(
+			(candidate) => candidate.name === "identity.bob",
+		);
+		expect(finding?.ok).toBe(false);
+		expect(finding?.detail).toMatch(/country/);
+	});
+
+	it("passes a matching member profile", () => {
+		const input = emptyInput();
+		input.instanceText = instanceText;
+		input.members = [{ memberId: "bob", profile: profileFixture() }];
+		const byName = Object.fromEntries(
+			validateWorkspace(input).findings.map((finding) => [
+				finding.name,
+				finding,
+			]),
+		);
+		expect(byName["profile.bob"]?.ok).toBe(true);
+		expect(byName["identity.bob"]?.ok).toBe(true);
 	});
 });
 

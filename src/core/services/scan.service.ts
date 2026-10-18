@@ -5,7 +5,7 @@ import {
 	type Dwelling,
 	type NewDwelling,
 } from "../domain/dwelling.js";
-import type { FeedEntry } from "../domain/feed.js";
+import type { FeedEntry, FeedMember } from "../domain/feed.js";
 import { normalizeListing, type NewOffer } from "../domain/listing.js";
 import type { Offer, OfferVersion } from "../domain/offer.js";
 import type { Verdict } from "../domain/verdict.js";
@@ -28,9 +28,9 @@ export interface ScanDependencies {
 	store: OfferStorePort;
 	pack: CountryPack;
 	clock: ClockPort;
-	profile: Profile;
+	poolProfile: Profile;
 	filters: FilterStage[];
-	memberId: string;
+	members: FeedMember[];
 	paceMs?: number;
 	log?: (message: string) => void;
 }
@@ -40,9 +40,9 @@ interface ScanWiring {
 	events: EventBus;
 	pack: CountryPack;
 	clock: ClockPort;
-	profile: Profile;
+	poolProfile: Profile;
 	filters: FilterStage[];
-	memberId: string;
+	members: FeedMember[];
 	fetch: FetchContext;
 }
 
@@ -73,16 +73,16 @@ export function scan(dependencies: ScanDependencies): Promise<ScanResult> {
 }
 
 function toWiring(dependencies: ScanDependencies): ScanWiring {
-	const { store, events, pack, clock, profile, filters, memberId } =
+	const { store, events, pack, clock, poolProfile, filters, members } =
 		dependencies;
 	return {
 		store,
 		events,
 		pack,
 		clock,
-		profile,
+		poolProfile,
 		filters,
-		memberId,
+		members,
 		fetch: createFetchContext(dependencies),
 	};
 }
@@ -201,53 +201,62 @@ function judgePool(job: PoolJob): PoolOutcome {
 	const run = runFilters(wiring.filters, {
 		offer,
 		dwelling,
-		profile: wiring.profile,
+		profile: wiring.poolProfile,
 		comparables: [],
 	});
 	return { verdicts: run.verdicts, passed: run.passed };
 }
 
-/** Adds each pooled offer the member filter lets through to the feed, emitting milestones. */
+/** Adds each pooled offer to every member's feed when their profile lets it through. */
 async function buildFeed(
 	wiring: ScanWiring,
 	pooled: PooledOffer[],
 ): Promise<void> {
-	for (const entry of pooled) await placeInFeed(entry, wiring);
+	for (const member of wiring.members)
+		for (const entry of pooled)
+			await placeInFeed({ entry, member, wiring });
 }
 
-async function placeInFeed(
-	entry: PooledOffer,
-	wiring: ScanWiring,
-): Promise<void> {
+interface PlaceInFeedJob {
+	entry: PooledOffer;
+	member: FeedMember;
+	wiring: ScanWiring;
+}
+
+async function placeInFeed(job: PlaceInFeedJob): Promise<void> {
+	const { entry, member, wiring } = job;
 	const { offer, dwelling, enteredAt, changed } = entry;
 	const existing = await wiring.store.findFeedEntry(
-		wiring.memberId,
+		member.memberId,
 		offer.id,
 	);
 	if (existing !== null) {
-		if (changed) await publishUpdate({ offer, feed: existing, wiring });
+		if (changed)
+			await publishUpdate({ offer, feed: existing, member, wiring });
 		return;
 	}
 	const run = runFilters(wiring.filters, {
 		offer,
 		dwelling,
-		profile: wiring.profile,
+		profile: member.profile,
 		comparables: [],
 	});
-	if (run.passed) await publishFeedEntry({ offer, enteredAt, wiring });
+	if (run.passed)
+		await publishFeedEntry({ offer, enteredAt, member, wiring });
 }
 
 async function publishFeedEntry(job: {
 	offer: Offer;
 	enteredAt: string;
+	member: FeedMember;
 	wiring: ScanWiring;
 }): Promise<void> {
-	const { offer, enteredAt, wiring } = job;
+	const { offer, enteredAt, member, wiring } = job;
 	const entry: FeedEntry = {
-		memberId: wiring.memberId,
+		memberId: member.memberId,
 		offerId: offer.id,
 		addedAt: enteredAt,
-		state: wiring.profile.gate ? "to-evaluate" : "accepted",
+		state: member.profile.gate ? "to-evaluate" : "accepted",
 	};
 	await wiring.store.addToFeed(entry);
 	await wiring.events.emit("offer.passed", { offer, feed: entry });
@@ -256,10 +265,11 @@ async function publishFeedEntry(job: {
 async function publishUpdate(job: {
 	offer: Offer;
 	feed: FeedEntry;
+	member: FeedMember;
 	wiring: ScanWiring;
 }): Promise<void> {
-	const { offer, feed, wiring } = job;
-	const decision = await wiring.store.findDecision(wiring.memberId, offer.id);
+	const { offer, feed, member, wiring } = job;
+	const decision = await wiring.store.findDecision(member.memberId, offer.id);
 	await wiring.events.emit("offer.updated", {
 		offer,
 		feed,

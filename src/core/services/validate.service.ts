@@ -1,4 +1,5 @@
 import yaml from "js-yaml";
+import { DEFAULT_MEMBER_ID } from "../domain/member.js";
 import { errorMessage } from "../errors/message.js";
 import type { Finding, ValidationReport } from "../ports/application.port.js";
 import type { StoreDescription } from "../ports/store.port.js";
@@ -8,17 +9,23 @@ import {
 	ExtensionsFileSchema,
 	type ExtensionApproval,
 } from "../schemas/index.js";
-import { InstanceSchema } from "../schemas/instance.js";
+import { InstanceSchema, type Instance } from "../schemas/instance.js";
 import type { Profile } from "../schemas/profile.js";
 import { API_VERSION } from "../version.js";
 
-/** Everything validation reads: the instance file, the store config and admin profile, and the extension manifest. */
+/** Everything validation reads: the instance file, the store config and profiles, and the extension manifest. */
+export interface MemberProfile {
+	memberId: string;
+	profile: Profile | null;
+}
+
 export interface WorkspaceInput {
 	instanceText: string | null;
 	config: Config | null;
 	profile: Profile | null;
 	configError?: string;
 	profileError?: string;
+	members: MemberProfile[];
 	extensionsText: string | null;
 	currentHashes: Record<string, string | null>;
 	store: StoreDescription;
@@ -36,6 +43,7 @@ export function validateWorkspace(input: WorkspaceInput): ValidationReport {
 			validateStoreProfile(input.profile, input.profileError),
 			...verifyApprovals(input.extensionsText, input.currentHashes),
 			...checkIdentity(input),
+			...validateMemberProfiles(input),
 			checkDatabase(input.store),
 			checkSchemaVersion(input),
 			checkApiVersion(),
@@ -82,24 +90,75 @@ function invalid(name: string, reason: string): Finding {
 }
 
 function checkIdentity(input: WorkspaceInput): Finding[] {
-	if (input.instanceText === null || input.profile === null) return [];
-	const parsed = parseYaml(input.instanceText);
-	if (!parsed.ok) return [];
-	const instance = InstanceSchema.safeParse(parsed.data);
-	if (!instance.success) return [];
-	const mismatches: string[] = [];
-	if (instance.data.country !== input.profile.country)
-		mismatches.push("country");
-	if (instance.data.market !== input.profile.market)
-		mismatches.push("market");
-	if (mismatches.length === 0) return [{ name: "identity", ok: true }];
+	const instance = parseInstanceValue(input.instanceText);
+	if (instance === null || input.profile === null) return [];
 	return [
-		{
-			name: "identity",
-			ok: false,
-			detail: `instance.yml and the admin profile disagree on ${mismatches.join(", ")}`,
-		},
+		identityFinding(
+			"identity",
+			instance,
+			input.profile,
+			"the admin profile",
+		),
 	];
+}
+
+function validateMemberProfiles(input: WorkspaceInput): Finding[] {
+	const instance = parseInstanceValue(input.instanceText);
+	return input.members
+		.filter((member) => member.memberId !== DEFAULT_MEMBER_ID)
+		.flatMap((member) => memberFindings(member, instance));
+}
+
+function memberFindings(
+	member: MemberProfile,
+	instance: Instance | null,
+): Finding[] {
+	if (member.profile === null)
+		return [
+			{
+				name: `profile.${member.memberId}`,
+				ok: false,
+				detail: `missing — ${INIT_HINT}`,
+			},
+		];
+	const findings: Finding[] = [
+		{ name: `profile.${member.memberId}`, ok: true },
+	];
+	if (instance !== null)
+		findings.push(
+			identityFinding(
+				`identity.${member.memberId}`,
+				instance,
+				member.profile,
+				"the profile",
+			),
+		);
+	return findings;
+}
+
+function identityFinding(
+	name: string,
+	instance: Instance,
+	profile: Profile,
+	label: string,
+): Finding {
+	const mismatches: string[] = [];
+	if (instance.country !== profile.country) mismatches.push("country");
+	if (instance.market !== profile.market) mismatches.push("market");
+	if (mismatches.length === 0) return { name, ok: true };
+	return {
+		name,
+		ok: false,
+		detail: `instance.yml and ${label} disagree on ${mismatches.join(", ")}`,
+	};
+}
+
+function parseInstanceValue(text: string | null): Instance | null {
+	if (text === null) return null;
+	const parsed = parseYaml(text);
+	if (!parsed.ok) return null;
+	const checked = InstanceSchema.safeParse(parsed.data);
+	return checked.success ? checked.data : null;
 }
 
 function parseYaml(

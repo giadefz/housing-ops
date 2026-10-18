@@ -1,3 +1,5 @@
+import type { Profile } from "../schemas/profile.js";
+
 /** Every state a feed entry can hold: waiting for judgment, or flowed straight through. */
 export const FEED_STATES = ["to-evaluate", "accepted"] as const;
 
@@ -10,6 +12,12 @@ export interface FeedEntry {
 	offerId: string;
 	addedAt: string;
 	state: FeedState;
+}
+
+/** A member and the profile that narrows the pool for them. */
+export interface FeedMember {
+	memberId: string;
+	profile: Profile;
 }
 
 /** A member's place in the pool while filling the feed. */

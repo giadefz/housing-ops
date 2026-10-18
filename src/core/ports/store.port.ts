@@ -7,6 +7,7 @@ import type {
 } from "../domain/decision.js";
 import type { Dwelling } from "../domain/dwelling.js";
 import type { FeedCursor, FeedEntry } from "../domain/feed.js";
+import type { Member } from "../domain/member.js";
 import type { Offer } from "../domain/offer.js";
 import type { QueueView } from "../domain/queue.js";
 import type { Verdict } from "../domain/verdict.js";
@@ -134,6 +135,7 @@ export interface OfferStorePort {
 	writeConfig(config: Config): Promise<void>;
 	readMemberProfile(memberId: string): Promise<Profile | null>;
 	writeMemberProfile(memberId: string, profile: Profile): Promise<void>;
+	listMembers(): Promise<Member[]>;
 	addToPool(offerId: string, enteredAt: string): Promise<string>;
 	addToFeed(entry: FeedEntry): Promise<void>;
 	findFeedEntry(memberId: string, offerId: string): Promise<FeedEntry | null>;

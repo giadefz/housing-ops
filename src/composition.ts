@@ -15,6 +15,7 @@ import {
 import { createEventBusBuilder } from "./adapters/secondary/publishers/event-bus-builder.js";
 import { CorruptRecordError } from "./adapters/secondary/storage/sqlite/record.js";
 import type { CountryPack } from "./core/domain/country-pack.js";
+import type { FeedMember } from "./core/domain/feed.js";
 import { DEFAULT_MEMBER_ID } from "./core/domain/member.js";
 import { FilterNotFoundError } from "./core/errors/filter.js";
 import { ProfileNotFoundError } from "./core/errors/profile.js";
@@ -57,6 +58,7 @@ import { scan, type ScanDependencies } from "./core/services/scan.service.js";
 import { setVerdict } from "./core/services/verdict.service.js";
 import {
 	validateWorkspace,
+	type MemberProfile,
 	type WorkspaceInput,
 } from "./core/services/validate.service.js";
 import { getVersion } from "./core/version.js";
@@ -110,6 +112,14 @@ export async function createApplication(
 		filters,
 		warn,
 	});
+	const scanContext: ScanContext = {
+		providersText,
+		events,
+		pipelineText,
+		pack,
+		clock,
+		filters,
+	};
 	return {
 		getVersion,
 		validateWorkspace: () =>
@@ -119,6 +129,7 @@ export async function createApplication(
 				profile,
 				configError: snapshot.configError,
 				profileError: snapshot.profileError,
+				members: snapshot.members,
 				extensionsText: workspace.extensionsText,
 				currentHashes: workspace.currentHashes,
 				store: workspace.store,
@@ -161,11 +172,11 @@ export async function createApplication(
 				getFeedStatus({ store, memberId: input.memberId }),
 			),
 		fillFeed: (input) =>
-			withStore(storeFactory, root, (store) =>
+			withStore(storeFactory, root, async (store) =>
 				fillFeed({
 					store,
 					events,
-					profile: requireProfile(profile),
+					profile: await memberProfile(store, input.memberId),
 					filters: buildFilterStages(
 						pipelineText,
 						pack.code,
@@ -217,11 +228,11 @@ export async function createApplication(
 				}),
 			),
 		getDigest: (input) =>
-			withStore(storeFactory, root, (store) =>
+			withStore(storeFactory, root, async (store) =>
 				buildDigest({
 					store,
 					clock,
-					profile: requireProfile(profile),
+					profile: await memberProfile(store, input.memberId),
 					memberId: input.memberId,
 				}),
 			),
@@ -237,10 +248,10 @@ export async function createApplication(
 		listProviders: () => listProviderSummaries(providersText),
 		listFilters: () => listFilters(pipelineText, pack.code, filters),
 		checkFilter: (id) =>
-			withStore(storeFactory, root, (store) =>
+			withStore(storeFactory, root, async (store) =>
 				checkFilterPort({
 					filters,
-					profile: requireProfile(profile),
+					profile: await memberProfile(store, DEFAULT_MEMBER_ID),
 					id,
 					store,
 				}),
@@ -248,22 +259,11 @@ export async function createApplication(
 		testProvider: (id) => runProviderTest(providerTrial(providersText, id)),
 		scan: (input) =>
 			withStore(storeFactory, root, (store) =>
-				scan(
-					scanDependencies(
-						{
-							providersText,
-							events,
-							pipelineText,
-							profile: requireProfile(profile),
-							pack,
-							clock,
-							filters,
-							memberId: input.memberId,
-						},
-						input.providerId,
-						store,
-					),
-				),
+				runScan({
+					store,
+					context: scanContext,
+					providerId: input.providerId,
+				}),
 			),
 	};
 }
@@ -273,21 +273,23 @@ interface StoreSnapshot {
 	profile: Profile | null;
 	configError?: string;
 	profileError?: string;
+	members: MemberProfile[];
 }
 
-/** Reads the shared config and the admin profile from the store. */
+/** Reads the shared config, the admin profile, and every member profile from the store. */
 async function readStoreSnapshot(
 	storeFactory: StoreFactory,
 	root: string,
 ): Promise<StoreSnapshot> {
 	const description = storeFactory.describe(root);
 	if (description.schemaVersion === null)
-		return { config: null, profile: null };
+		return { config: null, profile: null, members: [] };
 	const handle = storeFactory.open(root);
 	try {
 		return {
 			...(await readSnapshotConfig(handle.store)),
 			...(await readSnapshotProfile(handle.store)),
+			members: await readSnapshotMembers(handle.store),
 		};
 	} finally {
 		handle.close();
@@ -320,10 +322,48 @@ async function readSnapshotProfile(
 	}
 }
 
-/** Returns the admin profile, or throws when it is not initialized. */
-function requireProfile(profile: Profile | null): Profile {
-	if (profile === null) throw new ProfileNotFoundError(DEFAULT_MEMBER_ID);
+async function readSnapshotMembers(
+	store: OfferStorePort,
+): Promise<MemberProfile[]> {
+	const members = await store.listMembers();
+	const profiles: MemberProfile[] = [];
+	for (const member of members)
+		profiles.push({
+			memberId: member.id,
+			profile: await profileOrNull(store, member.id),
+		});
+	return profiles;
+}
+
+async function profileOrNull(
+	store: OfferStorePort,
+	memberId: string,
+): Promise<Profile | null> {
+	try {
+		return await store.readMemberProfile(memberId);
+	} catch (error) {
+		if (error instanceof CorruptRecordError) return null;
+		throw error;
+	}
+}
+
+async function memberProfile(
+	store: OfferStorePort,
+	memberId: string,
+): Promise<Profile> {
+	const profile = await store.readMemberProfile(memberId);
+	if (profile === null) throw new ProfileNotFoundError(memberId);
 	return profile;
+}
+
+async function feedMembers(store: OfferStorePort): Promise<FeedMember[]> {
+	const members = await store.listMembers();
+	const result: FeedMember[] = [];
+	for (const member of members) {
+		const profile = await store.readMemberProfile(member.id);
+		if (profile !== null) result.push({ memberId: member.id, profile });
+	}
+	return result;
 }
 
 interface ProfileGapInput {
@@ -390,15 +430,44 @@ async function checkFilterPort(
 }
 
 /** The values scan needs that do not depend on which provider is being scanned. */
-interface ScanInputs {
+interface ScanContext {
 	providersText: string | null;
 	events: EventBus;
 	pipelineText: string | null;
-	profile: Profile;
 	pack: CountryPack;
 	clock: ClockPort;
 	filters: Map<string, FilterPort>;
-	memberId: string;
+}
+
+interface FeedProfiles {
+	poolProfile: Profile;
+	members: FeedMember[];
+}
+
+type ScanInputs = ScanContext & FeedProfiles;
+
+interface ScanRequest {
+	store: OfferStorePort;
+	context: ScanContext;
+	providerId?: string;
+}
+
+async function runScan(request: ScanRequest): Promise<ScanResult> {
+	const profiles = await loadFeedProfiles(request.store);
+	return scan(
+		scanDependencies(
+			{ ...request.context, ...profiles },
+			request.providerId,
+			request.store,
+		),
+	);
+}
+
+async function loadFeedProfiles(store: OfferStorePort): Promise<FeedProfiles> {
+	return {
+		poolProfile: await memberProfile(store, DEFAULT_MEMBER_ID),
+		members: await feedMembers(store),
+	};
 }
 
 function scanDependencies(
@@ -410,11 +479,11 @@ function scanDependencies(
 		providersText,
 		events,
 		pipelineText,
-		profile,
+		poolProfile,
+		members,
 		pack,
 		clock,
 		filters,
-		memberId,
 	} = inputs;
 	const providers = selectProviders(
 		buildProviders(providersText),
@@ -429,9 +498,9 @@ function scanDependencies(
 		store,
 		pack,
 		clock,
-		profile,
+		poolProfile,
 		filters: buildFilterStages(pipelineText, pack.code, filters),
-		memberId,
+		members,
 	};
 }
 

@@ -35,6 +35,7 @@ import {
 	saveFeedCursor,
 } from "./feed-cursor.js";
 import { listInteractions, recordInteraction } from "./interaction.js";
+import { listMembers } from "./member.js";
 import { readMemberProfile, writeMemberProfile } from "./member-profile.js";
 import { recordMarketOutcome } from "./market-event.js";
 import { migrate } from "./migrate.js";
@@ -74,6 +75,7 @@ export function createSqliteStore(database: Database.Database): OfferStorePort {
 			readMemberProfile(database, memberId),
 		writeMemberProfile: (memberId, profile) =>
 			writeMemberProfile(database, memberId, profile),
+		listMembers: async () => listMembers(database),
 		addToPool: (offerId, enteredAt) =>
 			addToPool(database, offerId, enteredAt),
 		addToFeed: (entry) => addToFeed(database, entry),

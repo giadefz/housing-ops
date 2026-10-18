@@ -10,6 +10,7 @@ import {
 	openStore,
 } from "../src/adapters/secondary/storage/sqlite/store.js";
 import { findDecision } from "../src/adapters/secondary/storage/sqlite/decision.js";
+import { saveMember } from "../src/adapters/secondary/storage/sqlite/member.js";
 import { findOfferByListing } from "../src/adapters/secondary/storage/sqlite/offer.js";
 import { irelandPack } from "../src/countries/ie/pack.js";
 import type { Decision } from "../src/core/domain/decision.js";
@@ -17,6 +18,7 @@ import type {
 	PipelineEvent,
 	PipelinePayload,
 } from "../src/core/domain/events.js";
+import type { FeedMember } from "../src/core/domain/feed.js";
 import type { Listing } from "../src/core/domain/listing.js";
 import { DEFAULT_MEMBER_ID } from "../src/core/domain/member.js";
 import { budgetFilter } from "../src/core/filters/budget.js";
@@ -63,6 +65,10 @@ function profile(overrides: Partial<Profile> = {}): Profile {
 	};
 }
 
+function memberFeeds(profileValue: Profile = profile()): FeedMember[] {
+	return [{ memberId: MEMBER, profile: profileValue }];
+}
+
 function listing(id: string, overrides: Partial<Listing> = {}): Listing {
 	return {
 		listing_id: id,
@@ -104,11 +110,20 @@ async function feedStateFor(
 	listingId: string,
 	provider = "fake",
 ): Promise<string | null> {
+	return feedStateForMember(database, MEMBER, listingId, provider);
+}
+
+async function feedStateForMember(
+	database: Database.Database,
+	memberId: string,
+	listingId: string,
+	provider = "fake",
+): Promise<string | null> {
 	const offer = await findOfferByListing(database, provider, listingId);
 	if (offer === null) return null;
 	const row = database
 		.prepare("SELECT state FROM feed WHERE member_id = ? AND offer_id = ?")
-		.get(MEMBER, offer.id) as { state: string } | undefined;
+		.get(memberId, offer.id) as { state: string } | undefined;
 	return row?.state ?? null;
 }
 
@@ -122,9 +137,9 @@ describe("scan", () => {
 			store,
 			pack: irelandPack,
 			clock,
-			profile: profile(),
+			poolProfile: profile(),
+			members: memberFeeds(profile()),
 			filters: [budgetStage],
-			memberId: MEMBER,
 		});
 		expect(result).toEqual({ fetched: 1, stored: 1, deadLettered: 0 });
 		expect(await decisionFor(database, "a")).toBeNull();
@@ -143,9 +158,9 @@ describe("scan", () => {
 			store,
 			pack: irelandPack,
 			clock,
-			profile: profile({ gate: true }),
+			poolProfile: profile({ gate: true }),
+			members: memberFeeds(profile({ gate: true })),
 			filters: [budgetStage],
-			memberId: MEMBER,
 		});
 		expect(await decisionFor(database, "a")).toBeNull();
 		expect(await feedStateFor(database, "a")).toBe("to-evaluate");
@@ -160,9 +175,11 @@ describe("scan", () => {
 			store,
 			pack: irelandPack,
 			clock,
-			profile: profile({ budget: { max: 1000, currency: "EUR" } }),
+			poolProfile: profile({ budget: { max: 1000, currency: "EUR" } }),
+			members: memberFeeds(
+				profile({ budget: { max: 1000, currency: "EUR" } }),
+			),
 			filters: [budgetStage],
-			memberId: MEMBER,
 		});
 		expect(await decisionFor(database, "a")).toBeNull();
 		expect(await feedStateFor(database, "a")).toBeNull();
@@ -180,9 +197,9 @@ describe("scan", () => {
 			store,
 			pack: irelandPack,
 			clock,
-			profile: profile(),
+			poolProfile: profile(),
+			members: memberFeeds(profile()),
 			filters: [budgetStage],
-			memberId: MEMBER,
 		});
 		expect(result).toEqual({ fetched: 2, stored: 1, deadLettered: 1 });
 		const dead: unknown[] = database
@@ -200,9 +217,9 @@ describe("scan", () => {
 			store,
 			pack: irelandPack,
 			clock,
-			profile: profile(),
+			poolProfile: profile(),
+			members: memberFeeds(profile()),
 			filters: [budgetStage],
-			memberId: MEMBER,
 		};
 		await scan(dependencies);
 		await scan(dependencies);
@@ -222,9 +239,9 @@ describe("scan", () => {
 			store,
 			pack: irelandPack,
 			clock,
-			profile: profile(),
+			poolProfile: profile(),
+			members: memberFeeds(profile()),
 			filters: [budgetStage],
-			memberId: MEMBER,
 		};
 		await scan({ ...base, providers: [providerOf([listing("a")])] });
 		await scan({
@@ -270,9 +287,9 @@ describe("scan", () => {
 			store,
 			pack: irelandPack,
 			clock,
-			profile: profile(),
+			poolProfile: profile(),
+			members: memberFeeds(profile()),
 			filters: [budgetStage],
-			memberId: MEMBER,
 		});
 		const dwellings: unknown[] = database
 			.prepare("SELECT id FROM dwellings")
@@ -311,9 +328,9 @@ describe("scan publishing", () => {
 			store,
 			pack: irelandPack,
 			clock,
-			profile: profile(),
+			poolProfile: profile(),
+			members: memberFeeds(profile()),
 			filters: [budgetStage],
-			memberId: MEMBER,
 		});
 		expect(emitted).toEqual(["offer.passed"]);
 	});
@@ -327,9 +344,9 @@ describe("scan publishing", () => {
 			events: bus,
 			pack: irelandPack,
 			clock,
-			profile: profile(),
+			poolProfile: profile(),
+			members: memberFeeds(profile()),
 			filters: [budgetStage],
-			memberId: MEMBER,
 		};
 		await scan({ ...base, providers: [providerOf([listing("a")])] });
 		await scan({
@@ -359,9 +376,9 @@ describe("scan publishing", () => {
 			store,
 			pack: irelandPack,
 			clock,
-			profile: profile(),
+			poolProfile: profile(),
+			members: memberFeeds(profile()),
 			filters: [budgetStage],
-			memberId: MEMBER,
 		};
 		await scan(dependencies);
 		await scan(dependencies);
@@ -384,9 +401,9 @@ describe("scan publishing", () => {
 			store,
 			pack: irelandPack,
 			clock,
-			profile: profile(),
+			poolProfile: profile(),
+			members: memberFeeds(profile()),
 			filters: [budgetStage],
-			memberId: MEMBER,
 		});
 		expect(payloads).toHaveLength(1);
 		expect(payloads[0]).toMatchObject({
@@ -408,9 +425,9 @@ describe("scan publishing", () => {
 			store,
 			pack: irelandPack,
 			clock,
-			profile: profile(),
+			poolProfile: profile(),
+			members: memberFeeds(profile()),
 			filters: [budgetStage],
-			memberId: MEMBER,
 		});
 		expect(result.stored).toBe(1);
 	});
@@ -426,9 +443,9 @@ describe("scan gate", () => {
 			store,
 			pack: irelandPack,
 			clock,
-			profile: profile({ gate: false }),
+			poolProfile: profile({ gate: false }),
+			members: memberFeeds(profile({ gate: false })),
 			filters: [budgetStage],
-			memberId: MEMBER,
 		});
 		expect(await decisionFor(database, "a")).toBeNull();
 		expect(await feedStateFor(database, "a")).toBe("accepted");
@@ -450,9 +467,9 @@ describe("scan gate", () => {
 			store,
 			pack: irelandPack,
 			clock,
-			profile: profile({ gate: true }),
+			poolProfile: profile({ gate: true }),
+			members: memberFeeds(profile({ gate: true })),
 			filters: [budgetStage],
-			memberId: MEMBER,
 		});
 		expect(await decisionFor(database, "a")).toBeNull();
 		expect(await feedStateFor(database, "a")).toBe("to-evaluate");
@@ -477,9 +494,9 @@ describe("scan pool", () => {
 			store,
 			pack: irelandPack,
 			clock,
-			profile: profile(),
+			poolProfile: profile(),
+			members: memberFeeds(profile()),
 			filters: [budgetStage],
-			memberId: MEMBER,
 		});
 		const offer = await findOfferByListing(database, "fake", "a");
 		expect(poolIds(database)).toEqual([offer?.id]);
@@ -494,9 +511,11 @@ describe("scan pool", () => {
 			store,
 			pack: irelandPack,
 			clock,
-			profile: profile({ budget: { max: 1000, currency: "EUR" } }),
+			poolProfile: profile({ budget: { max: 1000, currency: "EUR" } }),
+			members: memberFeeds(
+				profile({ budget: { max: 1000, currency: "EUR" } }),
+			),
 			filters: [budgetStage],
-			memberId: MEMBER,
 		});
 		expect(poolIds(database)).toEqual([]);
 	});
@@ -510,9 +529,9 @@ describe("scan pool", () => {
 			store,
 			pack: irelandPack,
 			clock,
-			profile: profile(),
+			poolProfile: profile(),
+			members: memberFeeds(profile()),
 			filters: [budgetStage],
-			memberId: MEMBER,
 		};
 		await scan(dependencies);
 		await scan(dependencies);
@@ -537,9 +556,9 @@ describe("scan feed", () => {
 			store,
 			pack: irelandPack,
 			clock,
-			profile: profile({ gate: false }),
+			poolProfile: profile({ gate: false }),
+			members: memberFeeds(profile({ gate: false })),
 			filters: [budgetStage],
-			memberId: MEMBER,
 		});
 		expect(feedStates(database)).toEqual(["accepted"]);
 	});
@@ -553,9 +572,9 @@ describe("scan feed", () => {
 			store,
 			pack: irelandPack,
 			clock,
-			profile: profile({ gate: true }),
+			poolProfile: profile({ gate: true }),
+			members: memberFeeds(profile({ gate: true })),
 			filters: [budgetStage],
-			memberId: MEMBER,
 		});
 		expect(feedStates(database)).toEqual(["to-evaluate"]);
 	});
@@ -569,9 +588,11 @@ describe("scan feed", () => {
 			store,
 			pack: irelandPack,
 			clock,
-			profile: profile({ budget: { max: 1000, currency: "EUR" } }),
+			poolProfile: profile({ budget: { max: 1000, currency: "EUR" } }),
+			members: memberFeeds(
+				profile({ budget: { max: 1000, currency: "EUR" } }),
+			),
 			filters: [budgetStage],
-			memberId: MEMBER,
 		});
 		expect(feedStates(database)).toEqual([]);
 	});
@@ -585,12 +606,69 @@ describe("scan feed", () => {
 			store,
 			pack: irelandPack,
 			clock,
-			profile: profile(),
+			poolProfile: profile(),
+			members: memberFeeds(),
 			filters: [budgetStage],
-			memberId: MEMBER,
 		};
 		await scan(dependencies);
 		await scan(dependencies);
 		expect(feedStates(database)).toHaveLength(1);
+	});
+});
+
+describe("scan cascade", () => {
+	it("builds independent member feeds over one pool", async () => {
+		const database = testDatabase();
+		const store = createSqliteStore(database);
+		await saveMember(database, {
+			id: "bob",
+			name: "Bob",
+			role: "member",
+			createdAt: "2026-10-04T00:00:00.000Z",
+		});
+		const local = profile();
+		const bob = profile({
+			budget: { max: 1500, currency: "EUR" },
+		});
+		await scan({
+			providers: [
+				providerOf([
+					listing("cheap", {
+						price: {
+							amount: 1400,
+							currency: "EUR",
+							period: "month",
+						},
+					}),
+					listing("mid", {
+						price: {
+							amount: 2000,
+							currency: "EUR",
+							period: "month",
+						},
+					}),
+				]),
+			],
+			events: silentBus,
+			store,
+			pack: irelandPack,
+			clock,
+			poolProfile: local,
+			members: [
+				{ memberId: MEMBER, profile: local },
+				{ memberId: "bob", profile: bob },
+			],
+			filters: [budgetStage],
+		});
+		expect(await feedStateForMember(database, MEMBER, "cheap")).toBe(
+			"accepted",
+		);
+		expect(await feedStateForMember(database, MEMBER, "mid")).toBe(
+			"accepted",
+		);
+		expect(await feedStateForMember(database, "bob", "cheap")).toBe(
+			"accepted",
+		);
+		expect(await feedStateForMember(database, "bob", "mid")).toBeNull();
 	});
 });
