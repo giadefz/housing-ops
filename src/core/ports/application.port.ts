@@ -238,27 +238,57 @@ export interface InitCommand {
 	force: boolean;
 }
 
-/** The use-case surface every inbound (primary) adapter drives. Inbound adapters depend on this alone. */
-export interface ApplicationPort {
+/** Admin reads: version and workspace validation. */
+export interface AdminPort {
 	getVersion(): VersionInfo;
 	validateWorkspace(): ValidationReport;
+}
+
+/** Bootstrap and config: init, the shared config, and member profiles. */
+export interface ConfigPort {
 	init(request: InitCommand): Promise<InitResult>;
 	getConfig(): Promise<Config>;
 	setConfig(config: Config): Promise<Config>;
+	getProfile(input: ProfileGetQuery): Promise<ProfileValueResult>;
+	setProfile(input: ProfileSetQuery): Promise<ProfileSetResult>;
+}
+
+/** Offer reads and the member's feed. */
+export interface OffersPort {
 	getOffer(input: OfferQuery): Promise<OfferDetail>;
-	listProviders(): ProviderSummary[];
-	listFilters(): FilterSummary[];
-	checkFilter(id: string): Promise<FilterCheckResult>;
-	testProvider(id: string): Promise<ProviderTestResult>;
-	scan(input: ScanQuery): Promise<ScanResult>;
 	listQueue(input: QueueQuery): Promise<QueueResult>;
 	getFeedStatus(input: MemberQuery): Promise<FeedStatus>;
 	fillFeed(input: MemberQuery): Promise<FeedFillResult>;
 	emptyFeed(input: MemberQuery): Promise<FeedStatus>;
+}
+
+/** Member judgments, reactions, learning, and re-publishing. */
+export interface JudgmentsPort {
 	setVerdict(input: VerdictCommand): Promise<VerdictResult>;
 	interact(input: InteractionCommand): Promise<InteractionResult>;
-	getProfile(input: ProfileGetQuery): Promise<ProfileValueResult>;
-	setProfile(input: ProfileSetQuery): Promise<ProfileSetResult>;
 	getDigest(input: DigestQuery): Promise<DigestResult>;
 	publishNow(input: PublishQuery): Promise<PublishResult>;
 }
+
+/** Provider and filter catalogue. */
+export interface CatalogPort {
+	listProviders(): ProviderSummary[];
+	listFilters(): FilterSummary[];
+	checkFilter(id: string): Promise<FilterCheckResult>;
+	testProvider(id: string): Promise<ProviderTestResult>;
+}
+
+/** The scan command. */
+export interface ScanPort {
+	scan(input: ScanQuery): Promise<ScanResult>;
+}
+
+/** The use-case surface every inbound (primary) adapter drives. Inbound adapters depend on this alone. */
+export interface ApplicationPort
+	extends
+		AdminPort,
+		ConfigPort,
+		OffersPort,
+		JudgmentsPort,
+		CatalogPort,
+		ScanPort {}
