@@ -1,11 +1,11 @@
 import type {
-	OfferEventPayload,
 	PipelineEvent,
+	PipelinePayload,
 } from "../../core/domain/events.js";
 import { errorMessage } from "../../core/errors/message.js";
 import type { EventBus } from "../../core/ports/event-bus.port.js";
 
-type AnyHandler = (payload: OfferEventPayload) => void | Promise<void>;
+type AnyHandler = (payload: PipelinePayload) => void | Promise<void>;
 
 /** An in-process event bus: handlers subscribe per event, emit notifies them best-effort. */
 export function createEventBus(log: (message: string) => void): EventBus {

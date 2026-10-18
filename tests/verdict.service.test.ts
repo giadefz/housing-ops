@@ -69,11 +69,12 @@ function offerFixture(): Offer {
 }
 
 async function seed(
-	marketStatus: MarketStatus,
+	marketStatus?: MarketStatus,
 ): Promise<ReturnType<typeof createSqliteStore>> {
 	const { store } = testStore();
 	await store.saveDwelling(dwellingFixture());
 	await store.saveOffer(offerFixture());
+	if (marketStatus === undefined) return store;
 	const decision: Decision = {
 		memberId: MEMBER,
 		offerId: "offer-1",
@@ -86,7 +87,7 @@ async function seed(
 
 describe("setVerdict", () => {
 	it("records a triage judgment and moves the decision to screened", async () => {
-		const store = await seed("pending");
+		const store = await seed();
 		const result = await setVerdict({
 			store,
 			clock,
@@ -139,7 +140,7 @@ describe("setVerdict", () => {
 	});
 
 	it("rejects a verdict outside its tier", async () => {
-		const store = await seed("pending");
+		const store = await seed();
 		await expect(
 			setVerdict({
 				store,
@@ -153,7 +154,7 @@ describe("setVerdict", () => {
 	});
 
 	it("rejects an unknown offer", async () => {
-		const store = await seed("pending");
+		const store = await seed();
 		await expect(
 			setVerdict({
 				store,
@@ -180,7 +181,7 @@ function spyBus(): { bus: EventBus; emitted: PipelineEvent[] } {
 
 describe("setVerdict events", () => {
 	it("emits offer.screened on a triage screened", async () => {
-		const store = await seed("pending");
+		const store = await seed();
 		const { bus, emitted } = spyBus();
 		await setVerdict({
 			store,
@@ -212,7 +213,7 @@ describe("setVerdict events", () => {
 	});
 
 	it("emits nothing for a reject", async () => {
-		const store = await seed("pending");
+		const store = await seed();
 		const { bus, emitted } = spyBus();
 		await setVerdict({
 			store,

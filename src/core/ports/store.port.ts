@@ -6,13 +6,21 @@ import type {
 	UserStatus,
 } from "../domain/decision.js";
 import type { Dwelling } from "../domain/dwelling.js";
+import type { FeedEntry } from "../domain/feed.js";
 import type { Offer } from "../domain/offer.js";
+import type { QueueView } from "../domain/queue.js";
 import type { Verdict } from "../domain/verdict.js";
 
 /** An offer together with one member's standing on it. */
 export interface MemberOffer {
 	offer: Offer;
 	decision: Decision;
+}
+
+/** An offer together with a member's feed entry. */
+export interface FeedOffer {
+	offer: Offer;
+	feed: FeedEntry;
 }
 
 /** One queue entry. Compact by design: full payloads come from findOffer. */
@@ -24,7 +32,7 @@ export interface OfferSummary {
 	bedrooms?: number;
 	sizeM2?: number;
 	layout: string;
-	marketStatus: MarketStatus;
+	marketStatus?: MarketStatus;
 	userStatus: UserStatus;
 	fetchedAt: string;
 }
@@ -86,6 +94,12 @@ export interface OfferStatusQuery {
 	limit: number;
 }
 
+/** One page of a queue view. */
+export interface QueueViewQuery {
+	view: QueueView;
+	limit: number;
+}
+
 /** A market outcome to apply, with the offer and every decision it closes. */
 export interface MarketOutcomeCommand {
 	offer: Offer;
@@ -98,6 +112,10 @@ export interface OfferStorePort {
 	saveDwelling(dwelling: Dwelling): Promise<void>;
 	findDwellingByAddressKey(addressKey: string): Promise<Dwelling | null>;
 	saveOffer(offer: Offer): Promise<void>;
+	addToPool(offerId: string, enteredAt: string): Promise<void>;
+	addToFeed(entry: FeedEntry): Promise<void>;
+	findFeedEntry(memberId: string, offerId: string): Promise<FeedEntry | null>;
+	listFeedOffers(memberId: string, limit: number): Promise<FeedOffer[]>;
 	findOffer(id: string): Promise<Offer | null>;
 	findOfferByListing(
 		provider: string,
@@ -120,14 +138,8 @@ export interface OfferStorePort {
 	listAnalyses(memberId: string, offerId: string): Promise<Analysis[]>;
 	recordInteraction(interaction: Interaction): Promise<void>;
 	listInteractions(memberId: string, offerId: string): Promise<Interaction[]>;
-	listQueue(
-		memberId: string,
-		query: OfferStatusQuery,
-	): Promise<OfferSummary[]>;
-	countOffersByStatus(
-		memberId: string,
-		status: MarketStatus,
-	): Promise<number>;
+	listQueue(memberId: string, query: QueueViewQuery): Promise<OfferSummary[]>;
+	countQueue(memberId: string, view: QueueView): Promise<number>;
 	loadDigest(memberId: string): Promise<DigestData>;
 	listStoredOffers(limit: number): Promise<StoredOfferDetail[]>;
 	startRun(provider: string): Promise<string>;

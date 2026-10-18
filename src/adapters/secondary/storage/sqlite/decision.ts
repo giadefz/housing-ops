@@ -21,7 +21,7 @@ export const decisionTable: TableDefinition = {
 CREATE TABLE decisions (
 	member_id TEXT NOT NULL REFERENCES members(id),
 	offer_id TEXT NOT NULL REFERENCES offers(id),
-	market_status TEXT NOT NULL,
+	market_status TEXT,
 	user_status TEXT NOT NULL,
 	PRIMARY KEY (member_id, offer_id)
 );`,
@@ -30,7 +30,7 @@ CREATE TABLE decisions (
 const DecisionRecordSchema = z.object({
 	member_id: z.string(),
 	offer_id: z.string(),
-	market_status: z.string(),
+	market_status: z.string().nullable(),
 	user_status: z.string(),
 });
 
@@ -41,7 +41,7 @@ function toRecord(decision: Decision): DecisionRecord {
 	return {
 		member_id: decision.memberId,
 		offer_id: decision.offerId,
-		market_status: decision.marketStatus,
+		market_status: decision.marketStatus ?? null,
 		user_status: decision.userStatus,
 	};
 }
@@ -55,16 +55,19 @@ function toDomain(record: unknown): Decision {
 			parsed.error.message,
 		);
 	const valid = parsed.data;
+	const marketStatus =
+		valid.market_status === null
+			? undefined
+			: parseEnum(
+					"decisions",
+					decisionKey(record),
+					"market_status",
+					valid.market_status,
+					MARKET_STATUSES,
+				);
 	return {
 		memberId: valid.member_id,
 		offerId: valid.offer_id,
-		marketStatus: parseEnum(
-			"decisions",
-			decisionKey(record),
-			"market_status",
-			valid.market_status,
-			MARKET_STATUSES,
-		),
 		userStatus: parseEnum(
 			"decisions",
 			decisionKey(record),
@@ -72,6 +75,7 @@ function toDomain(record: unknown): Decision {
 			valid.user_status,
 			USER_STATUSES,
 		),
+		...(marketStatus === undefined ? {} : { marketStatus }),
 	};
 }
 

@@ -13,7 +13,10 @@ import { findDecision } from "../src/adapters/secondary/storage/sqlite/decision.
 import { findOfferByListing } from "../src/adapters/secondary/storage/sqlite/offer.js";
 import { irelandPack } from "../src/countries/ie/pack.js";
 import type { Decision } from "../src/core/domain/decision.js";
-import type { PipelineEvent } from "../src/core/domain/events.js";
+import type {
+	PipelineEvent,
+	PipelinePayload,
+} from "../src/core/domain/events.js";
 import type { Listing } from "../src/core/domain/listing.js";
 import { DEFAULT_MEMBER_ID } from "../src/core/domain/member.js";
 import { budgetFilter } from "../src/core/filters/budget.js";
@@ -96,8 +99,21 @@ async function decisionFor(
 	return offer === null ? null : findDecision(database, MEMBER, offer.id);
 }
 
+async function feedStateFor(
+	database: Database.Database,
+	listingId: string,
+	provider = "fake",
+): Promise<string | null> {
+	const offer = await findOfferByListing(database, provider, listingId);
+	if (offer === null) return null;
+	const row = database
+		.prepare("SELECT state FROM feed WHERE member_id = ? AND offer_id = ?")
+		.get(MEMBER, offer.id) as { state: string } | undefined;
+	return row?.state ?? null;
+}
+
 describe("scan", () => {
-	it("normalizes, filters, and stores a passing listing as passed", async () => {
+	it("normalizes, filters, and stores a passing listing into the pool and feed", async () => {
 		const database = testDatabase();
 		const store = createSqliteStore(database);
 		const result = await scan({
@@ -111,13 +127,14 @@ describe("scan", () => {
 			memberId: MEMBER,
 		});
 		expect(result).toEqual({ fetched: 1, stored: 1, deadLettered: 0 });
-		expect((await decisionFor(database, "a"))?.marketStatus).toBe("passed");
+		expect(await decisionFor(database, "a")).toBeNull();
+		expect(await feedStateFor(database, "a")).toBe("accepted");
 		expect(verdicts(database)).toEqual([
 			{ filter_id: "budget", outcome: "pass" },
 		]);
 	});
 
-	it("parks a passing offer as pending when the gate is on", async () => {
+	it("adds a passing offer to the feed as to-evaluate when the gate is on", async () => {
 		const database = testDatabase();
 		const store = createSqliteStore(database);
 		await scan({
@@ -130,12 +147,11 @@ describe("scan", () => {
 			filters: [budgetStage],
 			memberId: MEMBER,
 		});
-		expect((await decisionFor(database, "a"))?.marketStatus).toBe(
-			"pending",
-		);
+		expect(await decisionFor(database, "a")).toBeNull();
+		expect(await feedStateFor(database, "a")).toBe("to-evaluate");
 	});
 
-	it("leaves a filtered-out offer seen and records the failing verdict", async () => {
+	it("leaves a filtered-out offer out of the feed and records the failing verdict", async () => {
 		const database = testDatabase();
 		const store = createSqliteStore(database);
 		await scan({
@@ -148,7 +164,8 @@ describe("scan", () => {
 			filters: [budgetStage],
 			memberId: MEMBER,
 		});
-		expect((await decisionFor(database, "a"))?.marketStatus).toBe("seen");
+		expect(await decisionFor(database, "a")).toBeNull();
+		expect(await feedStateFor(database, "a")).toBeNull();
 		expect(verdicts(database)).toEqual([
 			{ filter_id: "budget", outcome: "fail" },
 		]);
@@ -332,6 +349,52 @@ describe("scan publishing", () => {
 		expect(emitted).toEqual(["offer.passed", "offer.updated"]);
 	});
 
+	it("does not re-emit offer.passed when a re-scan finds nothing new", async () => {
+		const database = testDatabase();
+		const store = createSqliteStore(database);
+		const { bus, emitted } = spyBus();
+		const dependencies = {
+			providers: [providerOf([listing("a")])],
+			events: bus,
+			store,
+			pack: irelandPack,
+			clock,
+			profile: profile(),
+			filters: [budgetStage],
+			memberId: MEMBER,
+		};
+		await scan(dependencies);
+		await scan(dependencies);
+		expect(emitted).toEqual(["offer.passed"]);
+	});
+
+	it("carries the feed entry, not a decision, on offer.passed", async () => {
+		const database = testDatabase();
+		const store = createSqliteStore(database);
+		const payloads: PipelinePayload[] = [];
+		const bus: EventBus = {
+			on() {},
+			async emit(_event, payload) {
+				payloads.push(payload);
+			},
+		};
+		await scan({
+			providers: [providerOf([listing("a")])],
+			events: bus,
+			store,
+			pack: irelandPack,
+			clock,
+			profile: profile(),
+			filters: [budgetStage],
+			memberId: MEMBER,
+		});
+		expect(payloads).toHaveLength(1);
+		expect(payloads[0]).toMatchObject({
+			feed: { memberId: MEMBER, state: "accepted" },
+		});
+		expect(payloads[0]).not.toHaveProperty("decision");
+	});
+
 	it("keeps the scan successful when a handler throws", async () => {
 		const database = testDatabase();
 		const store = createSqliteStore(database);
@@ -354,7 +417,7 @@ describe("scan publishing", () => {
 });
 
 describe("scan gate", () => {
-	it("never parks a passing offer as pending when the gate is off", async () => {
+	it("never creates a decision when the gate is off", async () => {
 		const database = testDatabase();
 		const store = createSqliteStore(database);
 		await scan({
@@ -367,10 +430,11 @@ describe("scan gate", () => {
 			filters: [budgetStage],
 			memberId: MEMBER,
 		});
-		expect((await decisionFor(database, "a"))?.marketStatus).toBe("passed");
+		expect(await decisionFor(database, "a")).toBeNull();
+		expect(await feedStateFor(database, "a")).toBe("accepted");
 	});
 
-	it("parks a passing offer as pending when the gate is on, and still emits offer.passed", async () => {
+	it("records no decision when the gate is on, and still emits offer.passed", async () => {
 		const database = testDatabase();
 		const store = createSqliteStore(database);
 		const emitted: PipelineEvent[] = [];
@@ -390,9 +454,143 @@ describe("scan gate", () => {
 			filters: [budgetStage],
 			memberId: MEMBER,
 		});
-		expect((await decisionFor(database, "a"))?.marketStatus).toBe(
-			"pending",
-		);
+		expect(await decisionFor(database, "a")).toBeNull();
+		expect(await feedStateFor(database, "a")).toBe("to-evaluate");
 		expect(emitted).toEqual(["offer.passed"]);
+	});
+});
+
+describe("scan pool", () => {
+	function poolIds(database: Database.Database): string[] {
+		const rows: unknown[] = database
+			.prepare("SELECT offer_id FROM pool ORDER BY entered_at")
+			.all();
+		return rows.map((row) => (row as { offer_id: string }).offer_id);
+	}
+
+	it("adds a passing listing to the pool", async () => {
+		const database = testDatabase();
+		const store = createSqliteStore(database);
+		await scan({
+			providers: [providerOf([listing("a")])],
+			events: silentBus,
+			store,
+			pack: irelandPack,
+			clock,
+			profile: profile(),
+			filters: [budgetStage],
+			memberId: MEMBER,
+		});
+		const offer = await findOfferByListing(database, "fake", "a");
+		expect(poolIds(database)).toEqual([offer?.id]);
+	});
+
+	it("does not add a filtered-out listing to the pool", async () => {
+		const database = testDatabase();
+		const store = createSqliteStore(database);
+		await scan({
+			providers: [providerOf([listing("a")])],
+			events: silentBus,
+			store,
+			pack: irelandPack,
+			clock,
+			profile: profile({ budget: { max: 1000, currency: "EUR" } }),
+			filters: [budgetStage],
+			memberId: MEMBER,
+		});
+		expect(poolIds(database)).toEqual([]);
+	});
+
+	it("keeps one pool row when re-scanning an unchanged listing", async () => {
+		const database = testDatabase();
+		const store = createSqliteStore(database);
+		const dependencies = {
+			providers: [providerOf([listing("a")])],
+			events: silentBus,
+			store,
+			pack: irelandPack,
+			clock,
+			profile: profile(),
+			filters: [budgetStage],
+			memberId: MEMBER,
+		};
+		await scan(dependencies);
+		await scan(dependencies);
+		expect(poolIds(database)).toHaveLength(1);
+	});
+});
+
+describe("scan feed", () => {
+	function feedStates(database: Database.Database): string[] {
+		const rows: unknown[] = database
+			.prepare("SELECT state FROM feed ORDER BY added_at")
+			.all();
+		return rows.map((row) => (row as { state: string }).state);
+	}
+
+	it("adds a passing listing to the feed as accepted when the gate is off", async () => {
+		const database = testDatabase();
+		const store = createSqliteStore(database);
+		await scan({
+			providers: [providerOf([listing("a")])],
+			events: silentBus,
+			store,
+			pack: irelandPack,
+			clock,
+			profile: profile({ gate: false }),
+			filters: [budgetStage],
+			memberId: MEMBER,
+		});
+		expect(feedStates(database)).toEqual(["accepted"]);
+	});
+
+	it("adds a passing listing to the feed as to-evaluate when the gate is on", async () => {
+		const database = testDatabase();
+		const store = createSqliteStore(database);
+		await scan({
+			providers: [providerOf([listing("a")])],
+			events: silentBus,
+			store,
+			pack: irelandPack,
+			clock,
+			profile: profile({ gate: true }),
+			filters: [budgetStage],
+			memberId: MEMBER,
+		});
+		expect(feedStates(database)).toEqual(["to-evaluate"]);
+	});
+
+	it("does not add a filtered-out listing to the feed", async () => {
+		const database = testDatabase();
+		const store = createSqliteStore(database);
+		await scan({
+			providers: [providerOf([listing("a")])],
+			events: silentBus,
+			store,
+			pack: irelandPack,
+			clock,
+			profile: profile({ budget: { max: 1000, currency: "EUR" } }),
+			filters: [budgetStage],
+			memberId: MEMBER,
+		});
+		expect(feedStates(database)).toEqual([]);
+	});
+
+	it("keeps one feed row when re-scanning an unchanged listing", async () => {
+		const database = testDatabase();
+		const store = createSqliteStore(database);
+		const dependencies = {
+			providers: [providerOf([listing("a")])],
+			events: silentBus,
+			store,
+			pack: irelandPack,
+			clock,
+			profile: profile(),
+			filters: [budgetStage],
+			memberId: MEMBER,
+		};
+		await scan(dependencies);
+		await scan(dependencies);
+		expect(feedStates(database)).toHaveLength(1);
 	});
 });

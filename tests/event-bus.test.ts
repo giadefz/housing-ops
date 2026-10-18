@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createEventBus } from "../src/adapters/secondary/event-bus.js";
-import type { Decision } from "../src/core/domain/decision.js";
+import type { FeedEntry } from "../src/core/domain/feed.js";
 import type { Offer } from "../src/core/domain/offer.js";
 
 function offerFixture(): Offer {
@@ -19,16 +19,16 @@ function offerFixture(): Offer {
 	};
 }
 
-function decisionFixture(): Decision {
+function feedFixture(): FeedEntry {
 	return {
 		memberId: "local",
 		offerId: "o1",
-		marketStatus: "passed",
-		userStatus: "none",
+		addedAt: "2026-10-04T00:00:00.000Z",
+		state: "to-evaluate",
 	};
 }
 
-const payload = { offer: offerFixture(), decision: decisionFixture() };
+const payload = { offer: offerFixture(), feed: feedFixture() };
 
 describe("createEventBus", () => {
 	it("calls only the handlers subscribed to the event", async () => {

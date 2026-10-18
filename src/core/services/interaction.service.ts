@@ -5,7 +5,7 @@ import type { InteractionResult } from "../ports/application.port.js";
 import type { ClockPort } from "../ports/clock.port.js";
 import type { OfferStorePort } from "../ports/store.port.js";
 import type { InteractionInput } from "../schemas/requests.js";
-import { requireDecision, requireOffer } from "./offer.service.js";
+import { findOrOpenDecision, requireOffer } from "./offer.service.js";
 
 /** One request to record a user reaction on an offer. */
 export interface InteractionRequest {
@@ -22,7 +22,7 @@ export async function interact(
 ): Promise<InteractionResult> {
 	const { store, clock, memberId, offerId, input } = request;
 	await requireOffer(store, offerId);
-	const decision = await requireDecision(store, memberId, offerId);
+	const decision = await findOrOpenDecision(store, memberId, offerId);
 	const updated = recordUserAction(decision, input.action);
 	const interaction = toInteraction(memberId, offerId, input, clock.now());
 	await store.saveDecision(updated);

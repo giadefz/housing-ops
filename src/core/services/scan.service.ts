@@ -5,12 +5,7 @@ import {
 	type Dwelling,
 	type NewDwelling,
 } from "../domain/dwelling.js";
-import {
-	clearFilters,
-	parkForJudgment,
-	type Decision,
-} from "../domain/decision.js";
-import type { PipelineEvent } from "../domain/events.js";
+import type { FeedEntry } from "../domain/feed.js";
 import { normalizeListing, type NewOffer } from "../domain/listing.js";
 import type { Offer, OfferVersion } from "../domain/offer.js";
 import type { Verdict } from "../domain/verdict.js";
@@ -25,7 +20,6 @@ import type {
 	RunStats,
 } from "../ports/store.port.js";
 import type { Profile } from "../schemas/profile.js";
-import { requireDecision } from "./offer.service.js";
 import { runFilters, type FilterStage } from "./pipeline.service.js";
 
 export interface ScanDependencies {
@@ -52,22 +46,35 @@ interface ScanWiring {
 	fetch: FetchContext;
 }
 
+/** An offer the pool phase let through, with the dwelling the member filter needs. */
+interface PooledOffer {
+	offer: Offer;
+	dwelling: Dwelling;
+	changed: boolean;
+}
+
+/** One provider's contribution to the pool phase. */
+interface PoolPhase {
+	result: ScanResult;
+	pooled: PooledOffer[];
+}
+
 const EMPTY_RESULT: ScanResult = { fetched: 0, stored: 0, deadLettered: 0 };
+const EMPTY_PHASE: PoolPhase = { result: EMPTY_RESULT, pooled: [] };
 const FETCH_TIMEOUT_MS = 60_000;
 
-/** Fetches from each provider, normalizes, filters, stores, and emits milestones. */
+/** Fetches each provider into the pool, then builds the member's feed from what the scan pooled. */
 export function scan(dependencies: ScanDependencies): Promise<ScanResult> {
-	const {
-		providers,
-		events,
-		store,
-		pack,
-		clock,
-		profile,
-		filters,
-		memberId,
-	} = dependencies;
-	const wiring: ScanWiring = {
+	const wiring = toWiring(dependencies);
+	return runPoolPhase(dependencies.providers, wiring).then((phase) =>
+		buildFeed(wiring, phase.pooled).then(() => phase.result),
+	);
+}
+
+function toWiring(dependencies: ScanDependencies): ScanWiring {
+	const { store, events, pack, clock, profile, filters, memberId } =
+		dependencies;
+	return {
 		store,
 		events,
 		pack,
@@ -77,35 +84,42 @@ export function scan(dependencies: ScanDependencies): Promise<ScanResult> {
 		memberId,
 		fetch: createFetchContext(dependencies),
 	};
+}
+
+async function runPoolPhase(
+	providers: ProviderPort[],
+	wiring: ScanWiring,
+): Promise<PoolPhase> {
 	return providers.reduce(
 		async (previous, provider) =>
-			addResults(await previous, await scanProvider(provider, wiring)),
-		Promise.resolve(EMPTY_RESULT),
+			mergePhases(await previous, await scanProvider(provider, wiring)),
+		Promise.resolve(EMPTY_PHASE),
 	);
 }
 
 async function scanProvider(
 	provider: ProviderPort,
 	wiring: ScanWiring,
-): Promise<ScanResult> {
-	const { store } = wiring;
-	const runId = await store.startRun(provider.id);
-	const result = await foldRecords(provider, runId, wiring);
-	await store.finishRun(runId, toRunStats(result));
-	return result;
+): Promise<PoolPhase> {
+	const runId = await wiring.store.startRun(provider.id);
+	const phase = await foldRecords(provider, runId, wiring);
+	await wiring.store.finishRun(runId, toRunStats(phase));
+	return phase;
 }
 
 async function foldRecords(
 	provider: ProviderPort,
 	runId: string,
 	wiring: ScanWiring,
-): Promise<ScanResult> {
+): Promise<PoolPhase> {
+	const pooled: PooledOffer[] = [];
 	let result = EMPTY_RESULT;
 	for await (const record of provider.fetch({}, wiring.fetch)) {
 		const outcome = await storeRecord({ record, provider, runId, wiring });
-		result = addResults(result, countOutcome(outcome));
+		result = addResults(result, outcomeResult(outcome));
+		if (outcome.kind === "pooled") pooled.push(outcome.pooled);
 	}
-	return result;
+	return { result, pooled };
 }
 
 interface RecordJob {
@@ -115,107 +129,147 @@ interface RecordJob {
 	wiring: ScanWiring;
 }
 
-type Outcome = "stored" | "deadLettered";
+type RecordOutcome =
+	| { kind: "stored" }
+	| { kind: "deadLettered" }
+	| { kind: "pooled"; pooled: PooledOffer };
 
-async function storeRecord(job: RecordJob): Promise<Outcome> {
-	const outcome = await tryStore(job);
-	if (!outcome.stored) return "deadLettered";
-	await emitEvent(outcome.judged, outcome.changed, job.wiring.events);
-	return "stored";
-}
-
-type StoreOutcome =
-	{ stored: true; judged: Judged; changed: boolean } | { stored: false };
-
-async function tryStore(job: RecordJob): Promise<StoreOutcome> {
-	const { record, provider, runId, wiring } = job;
-	const { store, pack, clock } = wiring;
+async function storeRecord(job: RecordJob): Promise<RecordOutcome> {
 	try {
-		const fetchedAt = clock.now();
-		const normalized = normalizeListing({
-			listing: record,
-			pack,
-			fetchedAt,
-		});
-		const dwelling = await resolveDwelling(normalized.dwelling, wiring);
-		const resolved = await resolveOffer({
-			provider,
-			newOffer: normalized.offer,
-			dwellingId: dwelling.id,
-			payload: record,
-			wiring,
-		});
-		const decision = await requireDecision(
-			wiring.store,
-			wiring.memberId,
-			resolved.offer.id,
-		);
-		const judged = judge(resolved.offer, decision, dwelling, wiring);
-		await store.saveDwelling(dwelling);
-		await store.saveOffer(judged.offer);
-		await store.saveDecision(judged.decision);
-		await recordVerdicts(store, judged.offer.id, runId, judged.verdicts);
-		return { stored: true, judged, changed: resolved.changed };
+		return await tryStore(job);
 	} catch (error) {
-		await store.recordDeadLetter(
-			deadLetterEntry({ record, provider, runId, wiring, error }),
+		await job.wiring.store.recordDeadLetter(
+			deadLetterEntry({ ...job, error }),
 		);
-		return { stored: false };
+		return { kind: "deadLettered" };
 	}
 }
 
-/** Emits the milestone a stored offer reached, if any. */
-async function emitEvent(
-	judged: Judged,
-	changed: boolean,
-	events: EventBus,
-): Promise<void> {
-	const event = scanEvent(judged, changed);
-	if (event === null) return;
-	await events.emit(event, {
-		offer: judged.offer,
-		decision: judged.decision,
+async function tryStore(job: RecordJob): Promise<RecordOutcome> {
+	const { record, provider, runId, wiring } = job;
+	const { store, pack, clock } = wiring;
+	const fetchedAt = clock.now();
+	const normalized = normalizeListing({ listing: record, pack, fetchedAt });
+	const dwelling = await resolveDwelling(normalized.dwelling, wiring);
+	const resolved = await resolveOffer({
+		provider,
+		newOffer: normalized.offer,
+		dwellingId: dwelling.id,
+		payload: record,
+		wiring,
 	});
+	const pool = judgePool({
+		offer: resolved.offer,
+		dwelling,
+		resolved,
+		wiring,
+	});
+	await store.saveDwelling(dwelling);
+	await store.saveOffer(resolved.offer);
+	await recordVerdicts(store, resolved.offer.id, runId, pool.verdicts);
+	if (!pool.passed) return { kind: "stored" };
+	await store.addToPool(resolved.offer.id, fetchedAt);
+	return {
+		kind: "pooled",
+		pooled: { offer: resolved.offer, dwelling, changed: resolved.changed },
+	};
 }
 
-/** The milestone a stored offer emits, if any. */
-function scanEvent(judged: Judged, changed: boolean): PipelineEvent | null {
-	if (judged.passed) return "offer.passed";
-	if (changed) return "offer.updated";
-	return null;
-}
-
-interface Judged {
+interface PoolJob {
 	offer: Offer;
-	decision: Decision;
+	dwelling: Dwelling;
+	resolved: ResolvedOffer;
+	wiring: ScanWiring;
+}
+
+interface PoolOutcome {
 	verdicts: Verdict[];
 	passed: boolean;
 }
 
-/** Runs the pipeline on a first sighting; a filtered-out decision stays "seen". */
-function judge(
-	offer: Offer,
-	decision: Decision,
-	dwelling: Dwelling,
-	wiring: ScanWiring,
-): Judged {
-	if (decision.marketStatus !== "seen")
-		return { offer, decision, verdicts: [], passed: false };
+/** Runs the pool filter on a new or changed offer. An unchanged offer is skipped. */
+function judgePool(job: PoolJob): PoolOutcome {
+	const { offer, dwelling, resolved, wiring } = job;
+	if (!resolved.isNew && !resolved.changed)
+		return { verdicts: [], passed: false };
 	const run = runFilters(wiring.filters, {
 		offer,
 		dwelling,
 		profile: wiring.profile,
 		comparables: [],
 	});
-	if (!run.passed)
-		return { offer, decision, verdicts: run.verdicts, passed: false };
-	return {
+	return { verdicts: run.verdicts, passed: run.passed };
+}
+
+/** Adds each pooled offer the member filter lets through to the feed, emitting milestones. */
+async function buildFeed(
+	wiring: ScanWiring,
+	pooled: PooledOffer[],
+): Promise<void> {
+	for (const entry of pooled) await placeInFeed(entry, wiring);
+}
+
+async function placeInFeed(
+	entry: PooledOffer,
+	wiring: ScanWiring,
+): Promise<void> {
+	const { offer, dwelling, changed } = entry;
+	const existing = await wiring.store.findFeedEntry(
+		wiring.memberId,
+		offer.id,
+	);
+	if (existing !== null) {
+		if (changed) await publishUpdate({ offer, feed: existing, wiring });
+		return;
+	}
+	const run = runFilters(wiring.filters, {
 		offer,
-		decision: wiring.profile.gate
-			? parkForJudgment(decision)
-			: clearFilters(decision),
-		verdicts: run.verdicts,
-		passed: true,
+		dwelling,
+		profile: wiring.profile,
+		comparables: [],
+	});
+	if (run.passed) await publishFeedEntry({ offer, wiring });
+}
+
+async function publishFeedEntry(job: {
+	offer: Offer;
+	wiring: ScanWiring;
+}): Promise<void> {
+	const { offer, wiring } = job;
+	const entry: FeedEntry = {
+		memberId: wiring.memberId,
+		offerId: offer.id,
+		addedAt: wiring.clock.now(),
+		state: wiring.profile.gate ? "to-evaluate" : "accepted",
+	};
+	await wiring.store.addToFeed(entry);
+	await wiring.events.emit("offer.passed", { offer, feed: entry });
+}
+
+async function publishUpdate(job: {
+	offer: Offer;
+	feed: FeedEntry;
+	wiring: ScanWiring;
+}): Promise<void> {
+	const { offer, feed, wiring } = job;
+	const decision = await wiring.store.findDecision(wiring.memberId, offer.id);
+	await wiring.events.emit("offer.updated", {
+		offer,
+		feed,
+		...(decision === null ? {} : { decision }),
+	});
+}
+
+function outcomeResult(outcome: RecordOutcome): ScanResult {
+	if (outcome.kind === "deadLettered")
+		return { fetched: 1, stored: 0, deadLettered: 1 };
+	return { fetched: 1, stored: 1, deadLettered: 0 };
+}
+
+function mergePhases(left: PoolPhase, right: PoolPhase): PoolPhase {
+	return {
+		result: addResults(left.result, right.result),
+		pooled: [...left.pooled, ...right.pooled],
 	};
 }
 
@@ -252,6 +306,7 @@ interface OfferJob {
 interface ResolvedOffer {
 	offer: Offer;
 	changed: boolean;
+	isNew: boolean;
 }
 
 async function resolveOffer(job: OfferJob): Promise<ResolvedOffer> {
@@ -277,6 +332,7 @@ async function resolveOffer(job: OfferJob): Promise<ResolvedOffer> {
 			versions: nextVersions({ existing, newOffer, payload }),
 		},
 		changed: existing !== null && hasChanged(existing, newOffer),
+		isNew: existing === null,
 	};
 }
 
@@ -340,12 +396,6 @@ function deadLetterEntry(job: DeadLetterJob): DeadLetterEntry {
 	};
 }
 
-function countOutcome(outcome: Outcome): ScanResult {
-	return outcome === "stored"
-		? { fetched: 1, stored: 1, deadLettered: 0 }
-		: { fetched: 1, stored: 0, deadLettered: 1 };
-}
-
 function addResults(left: ScanResult, right: ScanResult): ScanResult {
 	return {
 		fetched: left.fetched + right.fetched,
@@ -354,14 +404,14 @@ function addResults(left: ScanResult, right: ScanResult): ScanResult {
 	};
 }
 
-function toRunStats(result: ScanResult): RunStats {
+function toRunStats(phase: PoolPhase): RunStats {
 	return {
-		fetched: result.fetched,
-		normalized: result.stored,
-		passed: result.stored,
-		failed: result.deadLettered,
+		fetched: phase.result.fetched,
+		normalized: phase.result.stored,
+		passed: phase.pooled.length,
+		failed: phase.result.deadLettered,
 		skipped: 0,
-		stored: result.stored,
+		stored: phase.result.stored,
 	};
 }
 

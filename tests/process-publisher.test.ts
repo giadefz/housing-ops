@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { createProcessPublisher } from "../src/adapters/secondary/publishers/process-publisher.js";
-import type { Decision } from "../src/core/domain/decision.js";
+import type { FeedEntry } from "../src/core/domain/feed.js";
 import type { Offer } from "../src/core/domain/offer.js";
 import type { PublisherEntry } from "../src/core/schemas/index.js";
 
@@ -35,16 +35,16 @@ function offerFixture(): Offer {
 	};
 }
 
-function decisionFixture(): Decision {
+function feedFixture(): FeedEntry {
 	return {
 		memberId: "local",
 		offerId: "o1",
-		marketStatus: "passed",
-		userStatus: "none",
+		addedAt: "2026-10-04T00:00:00.000Z",
+		state: "to-evaluate",
 	};
 }
 
-const payload = { offer: offerFixture(), decision: decisionFixture() };
+const payload = { offer: offerFixture(), feed: feedFixture() };
 
 function entry(overrides: Partial<PublisherEntry> = {}): PublisherEntry {
 	return {

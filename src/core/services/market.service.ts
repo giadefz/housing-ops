@@ -7,7 +7,7 @@ import {
 import type { ClockPort } from "../ports/clock.port.js";
 import type { EventBus } from "../ports/event-bus.port.js";
 import type { OfferStorePort } from "../ports/store.port.js";
-import { requireDecision, requireOffer } from "./offer.service.js";
+import { findOrOpenDecision, requireOffer } from "./offer.service.js";
 
 /** One request to record a proven market outcome. */
 export interface MarketOutcomeRequest {
@@ -26,7 +26,7 @@ export async function markOutcome(
 ): Promise<Decision> {
 	const { store, clock, events, memberId, offerId, outcome, runId } = request;
 	const offer = await requireOffer(store, offerId);
-	const caller = await requireDecision(store, memberId, offerId);
+	const caller = await findOrOpenDecision(store, memberId, offerId);
 	const callerClosed = recordMarketEvent(caller, outcome);
 	const others = await closeOtherMembers(store, memberId, offerId, outcome);
 	const closed = [callerClosed, ...others];

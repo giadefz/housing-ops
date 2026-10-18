@@ -5,11 +5,13 @@ import { analysisTable } from "./analysis.js";
 import { deadLetterTable } from "./dead-letter.js";
 import { decisionTable } from "./decision.js";
 import { dwellingTable } from "./dwelling.js";
+import { feedTable } from "./feed.js";
 import { interactionTable } from "./interaction.js";
 import { marketEventTable } from "./market-event.js";
 import { memberTable } from "./member.js";
 import { offerTable } from "./offer.js";
 import { offerVersionTable } from "./offer-version.js";
+import { poolTable } from "./pool.js";
 import { providersStateTable } from "./providers-state.js";
 import { runTable } from "./run.js";
 import { verdictTable } from "./verdict.js";
@@ -31,6 +33,8 @@ const ENTITY_TABLES: TableDefinition[] = [
 	dwellingTable,
 	offerTable,
 	offerVersionTable,
+	poolTable,
+	feedTable,
 	verdictTable,
 	runTable,
 	deadLetterTable,

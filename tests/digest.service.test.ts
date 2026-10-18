@@ -87,7 +87,6 @@ async function seed(store: OfferStorePort): Promise<void> {
 		const decision: Decision = {
 			memberId: MEMBER,
 			offerId,
-			marketStatus: "seen",
 			userStatus: "none",
 		};
 		await store.saveDecision(decision);
@@ -182,7 +181,6 @@ describe("buildDigest", () => {
 		await store.saveDecision({
 			memberId: "bob",
 			offerId: "c",
-			marketStatus: "seen",
 			userStatus: "none",
 		});
 		const mine = await buildDigest({

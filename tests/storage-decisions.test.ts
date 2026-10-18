@@ -103,7 +103,6 @@ describe("decisions", () => {
 		const decision: Decision = {
 			memberId: DEFAULT_MEMBER_ID,
 			offerId: "offer-1",
-			marketStatus: "pending",
 			userStatus: "favorited",
 		};
 		await saveDecision(database, decision);

@@ -9,15 +9,15 @@ export interface QueueRequest {
 	input: QueueInput;
 }
 
-/** Lists one page of a member's offers with the given status, plus that status's total. */
+/** Lists one page of one queue view, plus that view's total. */
 export async function listQueue(request: QueueRequest): Promise<QueueResult> {
 	const { store, memberId, input } = request;
 	const offers = await store.listQueue(memberId, {
-		status: input.status,
+		view: input.status,
 		limit: input.limit,
 	});
 	return {
 		offers,
-		total: await store.countOffersByStatus(memberId, input.status),
+		total: await store.countQueue(memberId, input.status),
 	};
 }

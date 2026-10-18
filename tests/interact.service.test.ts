@@ -66,11 +66,12 @@ function offerFixture(): Offer {
 }
 
 async function seed(
-	marketStatus: MarketStatus,
+	marketStatus?: MarketStatus,
 ): Promise<ReturnType<typeof createSqliteStore>> {
 	const { store } = testStore();
 	await store.saveDwelling(dwellingFixture());
 	await store.saveOffer(offerFixture());
+	if (marketStatus === undefined) return store;
 	const decision: Decision = {
 		memberId: MEMBER,
 		offerId: "offer-1",
@@ -83,7 +84,7 @@ async function seed(
 
 describe("interact", () => {
 	it("records a favorite and moves the decision", async () => {
-		const store = await seed("passed");
+		const store = await seed();
 		const result = await interact({
 			store,
 			clock,
@@ -101,7 +102,7 @@ describe("interact", () => {
 	});
 
 	it("keeps the status on share but records the reaction", async () => {
-		const store = await seed("passed");
+		const store = await seed();
 		const result = await interact({
 			store,
 			clock,
@@ -112,12 +113,12 @@ describe("interact", () => {
 		const decision = await store.findDecision(MEMBER, "offer-1");
 		const interactions = await store.listInteractions(MEMBER, "offer-1");
 		expect(result.userStatus).toBe("none");
-		expect(decision?.marketStatus).toBe("passed");
+		expect(decision?.marketStatus).toBeUndefined();
 		expect(interactions[0]).toMatchObject({ action: "shared" });
 	});
 
 	it("records a rejection with a reason", async () => {
-		const store = await seed("passed");
+		const store = await seed();
 		await interact({
 			store,
 			clock,

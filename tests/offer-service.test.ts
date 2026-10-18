@@ -66,13 +66,6 @@ async function seed(
 ): Promise<void> {
 	await store.saveDwelling(dwellingFixture());
 	await store.saveOffer(offerFixture());
-	const decision: Decision = {
-		memberId: MEMBER,
-		offerId: "offer-1",
-		marketStatus: "seen",
-		userStatus: "none",
-	};
-	await store.saveDecision(decision);
 	await store.recordVerdict("offer-1", "run-1", {
 		filterId: "budget",
 		outcome: "pass",
@@ -84,14 +77,38 @@ describe("getOffer", () => {
 	it("returns the offer with the member's decision and the recorded verdicts", async () => {
 		const store = testStore();
 		await seed(store);
+		const decision: Decision = {
+			memberId: MEMBER,
+			offerId: "offer-1",
+			userStatus: "none",
+		};
+		await store.saveDecision(decision);
 		const detail = await getOffer(store, MEMBER, "offer-1");
 		expect(detail.offer.id).toBe("offer-1");
-		expect(detail.decision.marketStatus).toBe("seen");
+		expect(detail.decision).toEqual(decision);
+		expect(detail.feed).toBeUndefined();
 		expect(detail.analyses).toEqual([]);
 		expect(detail.interactions).toEqual([]);
 		expect(detail.verdicts).toEqual([
 			{ filterId: "budget", outcome: "pass", reason: "" },
 		]);
+	});
+	it("returns the feed entry when the offer is in the member's feed", async () => {
+		const store = testStore();
+		await seed(store);
+		await store.addToFeed({
+			memberId: MEMBER,
+			offerId: "offer-1",
+			addedAt: "2026-10-04T00:00:00.000Z",
+			state: "to-evaluate",
+		});
+		const detail = await getOffer(store, MEMBER, "offer-1");
+		expect(detail.feed).toMatchObject({
+			memberId: MEMBER,
+			offerId: "offer-1",
+			state: "to-evaluate",
+		});
+		expect(detail.decision).toBeUndefined();
 	});
 	it("throws OfferNotFoundError for an unknown id", async () => {
 		const store = testStore();

@@ -93,12 +93,30 @@ function spyBus(): { bus: EventBus; emitted: PipelineEvent[] } {
 }
 
 describe("publishNow", () => {
-	it("re-delivers offer.passed over passed and pending offers", async () => {
+	it("re-delivers offer.passed over the member's feed", async () => {
 		const { store } = testStore();
 		await store.saveDwelling(dwellingFixture());
-		await seed(store, "a", "passed");
-		await seed(store, "b", "pending");
-		await seed(store, "c", "seen");
+		await store.saveOffer(offerFixture("a"));
+		await store.saveOffer(offerFixture("b"));
+		await store.saveOffer(offerFixture("c"));
+		await store.addToFeed({
+			memberId: MEMBER,
+			offerId: "a",
+			addedAt: "2026-10-04T00:00:00.000Z",
+			state: "to-evaluate",
+		});
+		await store.addToFeed({
+			memberId: MEMBER,
+			offerId: "b",
+			addedAt: "2026-10-04T00:00:00.000Z",
+			state: "accepted",
+		});
+		await store.saveDecision({
+			memberId: MEMBER,
+			offerId: "c",
+			marketStatus: "screened",
+			userStatus: "none",
+		});
 		const { bus, emitted } = spyBus();
 		const result = await publishNow({
 			store,

@@ -12,9 +12,6 @@ import {
 
 /** Every market status a member's decision can hold. Single source for the MarketStatus union. */
 export const MARKET_STATUSES = [
-	"seen",
-	"passed",
-	"pending",
 	"screened",
 	"shortlisted",
 	"rejected",
@@ -47,25 +44,23 @@ export type UserAction = (typeof INTERACTION_ACTIONS)[number];
 export type MarketOutcome = "let" | "sold" | "gone";
 
 /** Everything that can move a decision's market status. */
-export type MarketEvent = "clear" | "park" | AnalysisVerdict | MarketOutcome;
+export type MarketEvent = AnalysisVerdict | MarketOutcome;
 
-/** One member's durable standing on one offer. */
+/** One member's durable judgment history on one offer. */
 export interface Decision {
 	memberId: string;
 	offerId: string;
-	marketStatus: MarketStatus;
+	marketStatus?: MarketStatus;
 	userStatus: UserStatus;
 }
 
-/** A member's opening standing on an offer they have not acted on yet. */
-export function freshDecision(memberId: string, offerId: string): Decision {
-	return { memberId, offerId, marketStatus: "seen", userStatus: "none" };
+/** A member's standing on an offer they have not judged or reacted to yet. */
+export function openDecision(memberId: string, offerId: string): Decision {
+	return { memberId, offerId, userStatus: "none" };
 }
 
-type MarketTransitions = Partial<Record<MarketEvent, MarketStatus>>;
-
-/** Moves allowed from any open market status: judgments and market outcomes. */
-const OPEN_MARKET_TRANSITIONS: MarketTransitions = {
+/** The market status each event sets. Every open decision accepts every event. */
+const EVENT_TARGET: Record<MarketEvent, MarketStatus> = {
 	screened: "screened",
 	shortlist: "shortlisted",
 	reject: "rejected",
@@ -75,39 +70,17 @@ const OPEN_MARKET_TRANSITIONS: MarketTransitions = {
 	gone: "gone",
 };
 
-/** The market machine. A closed decision (let/sold/gone) has no moves. */
-const MARKET_TRANSITIONS: Record<MarketStatus, MarketTransitions> = {
-	seen: { clear: "passed", park: "pending", ...OPEN_MARKET_TRANSITIONS },
-	passed: OPEN_MARKET_TRANSITIONS,
-	pending: OPEN_MARKET_TRANSITIONS,
-	screened: OPEN_MARKET_TRANSITIONS,
-	shortlisted: OPEN_MARKET_TRANSITIONS,
-	rejected: OPEN_MARKET_TRANSITIONS,
-	held: OPEN_MARKET_TRANSITIONS,
-	let: {},
-	sold: {},
-	gone: {},
-};
-
 /** Moves a decision along the market machine, or throws when the move is illegal. */
 export function transitionMarket(
 	decision: Decision,
 	event: MarketEvent,
 ): Decision {
-	const target = MARKET_TRANSITIONS[decision.marketStatus][event];
-	if (target === undefined)
-		throw new InvalidTransitionError(decision.marketStatus, event);
-	return { ...decision, marketStatus: target };
-}
-
-/** Sends a fresh sighting straight to the passed queue. Only from seen. */
-export function clearFilters(decision: Decision): Decision {
-	return transitionMarket(decision, "clear");
-}
-
-/** Parks a fresh sighting for agent judgment. Only from seen. */
-export function parkForJudgment(decision: Decision): Decision {
-	return transitionMarket(decision, "park");
+	if (isMarketClosed(decision.marketStatus))
+		throw new InvalidTransitionError(
+			decision.marketStatus ?? "unjudged",
+			event,
+		);
+	return { ...decision, marketStatus: EVENT_TARGET[event] };
 }
 
 /** Verdicts each tier may return. `screened` is triage-only, `shortlist` analysis-only. */
@@ -145,7 +118,10 @@ export function recordUserAction(
 	action: UserAction,
 ): Decision {
 	if (isMarketClosed(decision.marketStatus))
-		throw new InvalidTransitionError(decision.marketStatus, action);
+		throw new InvalidTransitionError(
+			decision.marketStatus ?? "unjudged",
+			action,
+		);
 	const target = USER_ACTION_STATUS[action];
 	return {
 		...decision,
@@ -154,7 +130,7 @@ export function recordUserAction(
 }
 
 /** True once a listing has left the market: let, sold, or gone. Such a decision is final. */
-export function isMarketClosed(status: MarketStatus): boolean {
+export function isMarketClosed(status: MarketStatus | undefined): boolean {
 	return status === "let" || status === "sold" || status === "gone";
 }
 

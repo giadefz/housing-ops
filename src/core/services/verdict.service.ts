@@ -12,7 +12,7 @@ import type { ClockPort } from "../ports/clock.port.js";
 import type { EventBus } from "../ports/event-bus.port.js";
 import type { OfferStorePort } from "../ports/store.port.js";
 import type { VerdictInput } from "../schemas/requests.js";
-import { requireDecision, requireOffer } from "./offer.service.js";
+import { findOrOpenDecision, requireOffer } from "./offer.service.js";
 
 /** One request to record a judgment on an offer. */
 export interface VerdictRequest {
@@ -30,7 +30,7 @@ export async function setVerdict(
 ): Promise<VerdictResult> {
 	const { store, clock, events, memberId, offerId, input } = request;
 	const offer = await requireOffer(store, offerId);
-	const decision = await requireDecision(store, memberId, offerId);
+	const decision = await findOrOpenDecision(store, memberId, offerId);
 	const judged = recordJudgment(decision, input.tier, input.verdict);
 	const analysis = toAnalysis(memberId, offerId, input, clock.now());
 	await store.saveDecision(judged);

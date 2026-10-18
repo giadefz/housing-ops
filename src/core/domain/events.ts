@@ -1,4 +1,5 @@
 import type { Decision } from "./decision.js";
+import type { FeedEntry } from "./feed.js";
 import type { Offer } from "./offer.js";
 
 /** Pipeline milestones. Publishers subscribe to these. */
@@ -13,19 +14,26 @@ export const PIPELINE_EVENTS = [
 /** A pipeline milestone a publisher can subscribe to. */
 export type PipelineEvent = (typeof PIPELINE_EVENTS)[number];
 
-/** The subject offer, and the member's standing on it, every pipeline event carries. */
-export interface OfferEventPayload {
+/** A milestone about a member's feed entry, with their judgment when they have one. */
+export interface FeedEventPayload {
+	offer: Offer;
+	feed: FeedEntry;
+	decision?: Decision;
+}
+
+/** A milestone about a member's judgment. */
+export interface JudgmentEventPayload {
 	offer: Offer;
 	decision: Decision;
 }
 
 /** The payload each pipeline event carries. Add an entry when adding an event. */
 export interface PipelineEventPayloads {
-	"offer.passed": OfferEventPayload;
-	"offer.screened": OfferEventPayload;
-	"offer.shortlisted": OfferEventPayload;
-	"offer.closed": OfferEventPayload;
-	"offer.updated": OfferEventPayload;
+	"offer.passed": FeedEventPayload;
+	"offer.updated": FeedEventPayload;
+	"offer.screened": JudgmentEventPayload;
+	"offer.shortlisted": JudgmentEventPayload;
+	"offer.closed": JudgmentEventPayload;
 }
 
 /** The payload type for a pipeline event. */

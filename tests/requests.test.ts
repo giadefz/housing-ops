@@ -70,12 +70,21 @@ describe("InteractionInputSchema", () => {
 describe("QueueInputSchema", () => {
 	it("defaults status and limit", () => {
 		expect(QueueInputSchema.parse({})).toEqual({
-			status: "pending",
+			status: "to-evaluate",
 			limit: 20,
 		});
 	});
 	it("rejects an unknown status and a non-positive limit", () => {
 		expect(QueueInputSchema.safeParse({ status: "nope" }).success).toBe(
+			false,
+		);
+		expect(QueueInputSchema.safeParse({ status: "passed" }).success).toBe(
+			false,
+		);
+		expect(QueueInputSchema.safeParse({ status: "seen" }).success).toBe(
+			false,
+		);
+		expect(QueueInputSchema.safeParse({ status: "pending" }).success).toBe(
 			false,
 		);
 		expect(QueueInputSchema.safeParse({ limit: 0 }).success).toBe(false);

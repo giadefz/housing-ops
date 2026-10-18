@@ -3,7 +3,6 @@ import os from "node:os";
 import path from "node:path";
 import type Database from "better-sqlite3";
 import { afterEach, describe, expect, it } from "vitest";
-import { findDecision } from "../src/adapters/secondary/storage/sqlite/decision.js";
 import { findOfferByListing } from "../src/adapters/secondary/storage/sqlite/offer.js";
 import {
 	closeStore,
@@ -20,13 +19,16 @@ afterEach(() => {
 
 const MEMBER = DEFAULT_MEMBER_ID;
 
-async function marketStatus(
+async function feedState(
 	database: Database.Database,
 	listingId: string,
 ): Promise<string | undefined> {
 	const offer = await findOfferByListing(database, "fake", listingId);
 	if (offer === null) return undefined;
-	return (await findDecision(database, MEMBER, offer.id))?.marketStatus;
+	const row = database
+		.prepare("SELECT state FROM feed WHERE member_id = ? AND offer_id = ?")
+		.get(MEMBER, offer.id) as { state: string } | undefined;
+	return row?.state;
 }
 
 const profileYaml = [
@@ -133,8 +135,10 @@ describe("end to end", () => {
 			const scan = await app.scan({ memberId: MEMBER });
 			expect(scan).toEqual({ fetched: 3, stored: 2, deadLettered: 1 });
 
-			expect(await marketStatus(database, "cheap")).toBe("passed");
-			expect(await marketStatus(database, "pricey")).toBe("seen");
+			expect(await feedState(database, "cheap")).toBe("accepted");
+			expect(await feedState(database, "pricey")).toBeUndefined();
+			const decisions = database.prepare("SELECT * FROM decisions").all();
+			expect(decisions).toEqual([]);
 
 			const dead: unknown[] = database
 				.prepare("SELECT * FROM dead_letter")

@@ -1,5 +1,6 @@
 import type { Analysis, Interaction } from "../domain/analysis.js";
 import type { Decision, UserStatus } from "../domain/decision.js";
+import type { FeedEntry } from "../domain/feed.js";
 import type { Listing } from "../domain/listing.js";
 import type { Offer } from "../domain/offer.js";
 import type { PipelineEvent } from "../domain/events.js";
@@ -34,10 +35,11 @@ export interface ValidationReport {
 	findings: Finding[];
 }
 
-/** One offer with one member's decision, analyses, interactions, and the world's verdicts. */
+/** One offer with one member's judgment, feed entry, analyses, interactions, and the pool's verdicts. */
 export interface OfferDetail {
 	offer: Offer;
-	decision: Decision;
+	decision?: Decision;
+	feed?: FeedEntry;
 	analyses: Analysis[];
 	interactions: Interaction[];
 	verdicts: Verdict[];

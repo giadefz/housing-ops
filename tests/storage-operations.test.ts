@@ -69,21 +69,26 @@ async function seed(
 ): Promise<void> {
 	await store.saveDwelling(dwellingFixture());
 	await store.saveOffer(offerFixture());
-	const decision: Decision = {
+}
+
+async function seedFeed(
+	store: ReturnType<typeof createSqliteStore>,
+): Promise<void> {
+	await seed(store);
+	await store.addToFeed({
 		memberId: MEMBER,
 		offerId: "offer-1",
-		marketStatus: "seen",
-		userStatus: "none",
-	};
-	await store.saveDecision(decision);
+		addedAt: "2026-10-04T00:00:00.000Z",
+		state: "to-evaluate",
+	});
 }
 
 describe("queue", () => {
-	it("returns compact rows joined with the dwelling", async () => {
+	it("returns compact rows for the to-evaluate view", async () => {
 		const { store } = testStore();
-		await seed(store);
+		await seedFeed(store);
 		const queue = await store.listQueue(MEMBER, {
-			status: "seen",
+			view: "to-evaluate",
 			limit: 10,
 		});
 		expect(queue).toHaveLength(1);
@@ -95,29 +100,89 @@ describe("queue", () => {
 			bedrooms: 2,
 			sizeM2: 85,
 			layout: "apartment",
-			marketStatus: "seen",
 			userStatus: "none",
 		});
+		expect(queue[0]?.marketStatus).toBeUndefined();
 		expect(
-			await store.listQueue(MEMBER, { status: "passed", limit: 10 }),
+			await store.listQueue(MEMBER, { view: "screened", limit: 10 }),
 		).toEqual([]);
 	});
-	it("counts offers by status", async () => {
+	it("lists judged decisions by market status", async () => {
 		const { store } = testStore();
 		await seed(store);
-		expect(await store.countOffersByStatus(MEMBER, "seen")).toBe(1);
-		expect(await store.countOffersByStatus(MEMBER, "passed")).toBe(0);
+		const decision: Decision = {
+			memberId: MEMBER,
+			offerId: "offer-1",
+			marketStatus: "screened",
+			userStatus: "favorited",
+		};
+		await store.saveDecision(decision);
+		const queue = await store.listQueue(MEMBER, {
+			view: "screened",
+			limit: 10,
+		});
+		expect(queue).toHaveLength(1);
+		expect(queue[0]).toMatchObject({
+			id: "offer-1",
+			marketStatus: "screened",
+			userStatus: "favorited",
+		});
+	});
+	it("counts offers by view", async () => {
+		const { store } = testStore();
+		await seedFeed(store);
+		await store.saveDecision({
+			memberId: MEMBER,
+			offerId: "offer-1",
+			marketStatus: "screened",
+			userStatus: "none",
+		});
+		expect(await store.countQueue(MEMBER, "to-evaluate")).toBe(0);
+		expect(await store.countQueue(MEMBER, "screened")).toBe(1);
 	});
 	it("lists a page through the service with a total", async () => {
 		const { store } = testStore();
-		await seed(store);
+		await seedFeed(store);
 		const page = await listQueue({
 			store,
 			memberId: MEMBER,
-			input: { status: "seen", limit: 10 },
+			input: { status: "to-evaluate", limit: 10 },
 		});
 		expect(page.offers).toHaveLength(1);
 		expect(page.total).toBe(1);
+	});
+	it("keeps a reacted but unjudged offer in the to-evaluate view", async () => {
+		const { store } = testStore();
+		await seedFeed(store);
+		await store.saveDecision({
+			memberId: MEMBER,
+			offerId: "offer-1",
+			userStatus: "favorited",
+		});
+		const queue = await store.listQueue(MEMBER, {
+			view: "to-evaluate",
+			limit: 10,
+		});
+		expect(queue).toHaveLength(1);
+		expect(queue[0]?.userStatus).toBe("favorited");
+		expect(await store.countQueue(MEMBER, "to-evaluate")).toBe(1);
+	});
+	it("excludes judged offers from the to-evaluate view", async () => {
+		const { store } = testStore();
+		await seedFeed(store);
+		await store.saveDecision({
+			memberId: MEMBER,
+			offerId: "offer-1",
+			marketStatus: "screened",
+			userStatus: "none",
+		});
+		expect(await store.countQueue(MEMBER, "to-evaluate")).toBe(0);
+		expect(
+			await store.listQueue(MEMBER, {
+				view: "to-evaluate",
+				limit: 10,
+			}),
+		).toEqual([]);
 	});
 });
 

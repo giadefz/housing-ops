@@ -79,13 +79,29 @@ async function seed(
 	const decision: Decision = {
 		memberId: MEMBER,
 		offerId: "offer-1",
-		marketStatus: "seen",
 		userStatus: "none",
 	};
 	await store.saveDecision(decision);
 }
 
 describe("markOutcome", () => {
+	it("opens the caller's decision when they have none", async () => {
+		const { database, store } = testStore();
+		await store.saveDwelling(dwellingFixture());
+		await store.saveOffer(offerFixture());
+		await markOutcome({
+			store,
+			clock,
+			events: silentBus,
+			memberId: MEMBER,
+			offerId: "offer-1",
+			outcome: "sold",
+		});
+		expect(findDecision(database, MEMBER, "offer-1")?.marketStatus).toBe(
+			"sold",
+		);
+	});
+
 	it("closes the decision and appends the market event", async () => {
 		const { database, store } = testStore();
 		await seed(store);
