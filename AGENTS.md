@@ -5,6 +5,13 @@ filters them, and stores everything in a local SQLite database. It makes no LLM
 calls of its own — you are the interface: you run its commands and read the JSON
 they print.
 
+## Memory
+
+This workspace keeps a private, gitignored memory of the user: `MEMORY.md` and
+`memory/`. Read `MEMORY.md` before answering anything that depends on the user's
+circumstances, taste, or communication style, and keep it current — the protocol
+is `.agents/skills/house-memory/`.
+
 ## Start here
 
 Run `housing-ops validate` first: it checks config, database, and version

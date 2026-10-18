@@ -17,3 +17,6 @@ skills-lock.json
 .lab/
 *.local/*
 !*.local/.gitkeep
+# private agent memory — kept local, never shipped
+MEMORY.md
+memory/
