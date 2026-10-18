@@ -3,7 +3,13 @@ import type {
 	OfferStorePort,
 	StoredOfferDetail,
 } from "../../../../core/ports/store.port.js";
-import { recordAnalysis } from "./analysis.js";
+import { listAnalyses, recordAnalysis } from "./analysis.js";
+import {
+	findDecision,
+	listDecisionsForOffer,
+	listMemberOffers,
+	saveDecision,
+} from "./decision.js";
 import { recordDeadLetter } from "./dead-letter.js";
 import {
 	findDwellingByAddressKey,
@@ -11,14 +17,13 @@ import {
 	saveDwelling,
 } from "./dwelling.js";
 import { loadDigest } from "./digest.js";
-import { recordInteraction } from "./interaction.js";
+import { listInteractions, recordInteraction } from "./interaction.js";
 import { recordMarketOutcome } from "./market-event.js";
 import { migrate } from "./migrate.js";
 import {
 	findOffer,
 	findOfferByListing,
 	listOfferIds,
-	listOffersByStatus,
 	saveOffer,
 } from "./offer.js";
 import { countOffersByStatus, listQueue } from "./queue.js";
@@ -47,26 +52,36 @@ export function createSqliteStore(database: Database.Database): OfferStorePort {
 		findOffer: (id) => findOffer(database, id),
 		findOfferByListing: (provider, listingId) =>
 			findOfferByListing(database, provider, listingId),
+		findDecision: async (memberId, offerId) =>
+			findDecision(database, memberId, offerId),
+		listDecisionsForOffer: async (offerId) =>
+			listDecisionsForOffer(database, offerId),
+		saveDecision: (decision) => saveDecision(database, decision),
+		listMemberOffers: (memberId, query) =>
+			listMemberOffers(database, memberId, query),
 		recordVerdict: (offerId, runId, verdict) =>
 			recordVerdict(database, offerId, runId, verdict),
 		listVerdicts: async (offerId) => listVerdicts(database, offerId),
 		recordAnalysis: (analysis) => recordAnalysis(database, analysis),
+		listAnalyses: async (memberId, offerId) =>
+			listAnalyses(database, memberId, offerId),
 		recordInteraction: (interaction) =>
 			recordInteraction(database, interaction),
-		listQueue: async (status, limit) => listQueue(database, status, limit),
-		listOffersByStatus: async (status, limit) =>
-			listOffersByStatus(database, status, limit),
-		countOffersByStatus: async (status) =>
-			countOffersByStatus(database, status),
-		loadDigest: async () => loadDigest(database),
+		listInteractions: async (memberId, offerId) =>
+			listInteractions(database, memberId, offerId),
+		listQueue: async (memberId, query) =>
+			listQueue(database, memberId, query),
+		countOffersByStatus: async (memberId, status) =>
+			countOffersByStatus(database, memberId, status),
+		loadDigest: async (memberId) => loadDigest(database, memberId),
 		listStoredOffers: async (limit) => listStoredOffers(database, limit),
 		startRun: (provider) => startRun(database, provider),
 		finishRun: (runId, stats) => finishRun(database, runId, stats),
 		recordDeadLetter: async (entry) => {
 			recordDeadLetter(database, entry);
 		},
-		recordMarketOutcome: async (offer, event) =>
-			recordMarketOutcome(database, offer, event),
+		recordMarketOutcome: async (command) =>
+			recordMarketOutcome(database, command),
 	};
 }
 

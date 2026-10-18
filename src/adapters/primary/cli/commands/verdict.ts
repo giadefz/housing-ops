@@ -1,6 +1,7 @@
 import { VerdictInputSchema } from "../../../../core/schemas/requests.js";
 import type { Flags } from "../argv.js";
 import { fail, ok } from "../envelope.js";
+import { CLI_MEMBER_ID } from "../identity.js";
 import { readList, readNumber, readString } from "./flags.js";
 import type { CommandHandler } from "./types.js";
 
@@ -15,7 +16,13 @@ export const verdictCommands: Record<string, CommandHandler> = {
 		const parsed = VerdictInputSchema.safeParse(verdictRequest(args.flags));
 		if (!parsed.success)
 			return fail({ code: "VALIDATION", message: parsed.error.message });
-		return ok(await app.setVerdict(args.rest[1], parsed.data));
+		return ok(
+			await app.setVerdict({
+				memberId: CLI_MEMBER_ID,
+				offerId: args.rest[1],
+				verdict: parsed.data,
+			}),
+		);
 	},
 };
 

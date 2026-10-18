@@ -1,17 +1,7 @@
 import type Database from "better-sqlite3";
 import { z } from "zod";
-import {
-	MARKET_STATUSES,
-	MARKETS,
-	USER_STATUSES,
-} from "../../../../core/domain/offer.js";
-import type {
-	MarketStatus,
-	Offer,
-	Price,
-} from "../../../../core/domain/offer.js";
-import { listAnalyses } from "./analysis.js";
-import { listInteractions } from "./interaction.js";
+import { MARKETS } from "../../../../core/domain/offer.js";
+import type { Offer, Price } from "../../../../core/domain/offer.js";
 import type { TableDefinition } from "./migrate.js";
 import { insertVersion, listVersions } from "./offer-version.js";
 import {
@@ -56,15 +46,13 @@ const OfferRecordSchema = z.object({
 	description: z.string(),
 	posted_at: z.string().nullable(),
 	fetched_at: z.string(),
-	status: z.string(),
-	user_status: z.string(),
 });
 
 /** Offers record DTO. JSON columns are text, absent values are null. */
 export type OfferRecord = z.infer<typeof OfferRecordSchema>;
 
-/** An offer without its children. Versions, analyses, and interactions load separately. */
-export type StoredOffer = Omit<Offer, "versions" | "analyses" | "interactions">;
+/** An offer without its versions. Versions load separately. */
+export type StoredOffer = Omit<Offer, "versions">;
 
 function toRecord(offer: Offer): OfferRecord {
 	return {
@@ -79,8 +67,6 @@ function toRecord(offer: Offer): OfferRecord {
 		description: offer.description,
 		posted_at: offer.postedAt ?? null,
 		fetched_at: offer.fetchedAt,
-		status: offer.marketStatus,
-		user_status: offer.userStatus,
 	};
 }
 
@@ -110,20 +96,6 @@ function toDomain(record: unknown): StoredOffer {
 		description: valid.description,
 		postedAt: valid.posted_at ?? undefined,
 		fetchedAt: valid.fetched_at,
-		marketStatus: parseEnum(
-			"offers",
-			valid.id,
-			"status",
-			valid.status,
-			MARKET_STATUSES,
-		),
-		userStatus: parseEnum(
-			"offers",
-			valid.id,
-			"user_status",
-			valid.user_status,
-			USER_STATUSES,
-		),
 	};
 }
 
@@ -147,12 +119,12 @@ function upsertOfferRecord(database: Database.Database, offer: Offer): void {
 	const record = toRecord(offer);
 	database
 		.prepare(
-			`INSERT INTO offers (id, dwelling_id, provider, listing_id, url, market, price, images, description, posted_at, fetched_at, status, user_status)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			`INSERT INTO offers (id, dwelling_id, provider, listing_id, url, market, price, images, description, posted_at, fetched_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			ON CONFLICT(id) DO UPDATE SET dwelling_id = excluded.dwelling_id, provider = excluded.provider,
 			listing_id = excluded.listing_id, url = excluded.url, market = excluded.market, price = excluded.price,
 			images = excluded.images, description = excluded.description, posted_at = excluded.posted_at,
-			fetched_at = excluded.fetched_at, status = excluded.status, user_status = excluded.user_status`,
+			fetched_at = excluded.fetched_at`,
 		)
 		.run(
 			record.id,
@@ -166,12 +138,10 @@ function upsertOfferRecord(database: Database.Database, offer: Offer): void {
 			record.description,
 			record.posted_at,
 			record.fetched_at,
-			record.status,
-			record.user_status,
 		);
 }
 
-/** Loads a full offer with versions, analyses, and interactions. Null when unknown. */
+/** Loads a full offer with its versions. Null when unknown. */
 export async function findOffer(
 	database: Database.Database,
 	id: string,
@@ -184,12 +154,7 @@ export async function findOffer(
 }
 
 function assembleOffer(database: Database.Database, base: StoredOffer): Offer {
-	return {
-		...base,
-		versions: listVersions(database, base.id),
-		analyses: listAnalyses(database, base.id),
-		interactions: listInteractions(database, base.id),
-	};
+	return { ...base, versions: listVersions(database, base.id) };
 }
 
 /** Resolves an offer by provider and listing id. Null when unknown. */
@@ -223,32 +188,4 @@ export function listOfferIds(
 		.prepare("SELECT id FROM offers ORDER BY fetched_at DESC LIMIT ?")
 		.all(limit);
 	return records.flatMap((record) => (hasId(record) ? [record.id] : []));
-}
-
-/** Lists recent offer ids with the given market status, newest first. */
-export function listOfferIdsByStatus(
-	database: Database.Database,
-	status: MarketStatus,
-	limit: number,
-): string[] {
-	const records: unknown[] = database
-		.prepare(
-			"SELECT id FROM offers WHERE status = ? ORDER BY fetched_at DESC LIMIT ?",
-		)
-		.all(status, limit);
-	return records.flatMap((record) => (hasId(record) ? [record.id] : []));
-}
-
-/** Loads full offers with the given market status, newest first. */
-export async function listOffersByStatus(
-	database: Database.Database,
-	status: MarketStatus,
-	limit: number,
-): Promise<Offer[]> {
-	const offers: Offer[] = [];
-	for (const id of listOfferIdsByStatus(database, status, limit)) {
-		const offer = await findOffer(database, id);
-		if (offer !== null) offers.push(offer);
-	}
-	return offers;
 }

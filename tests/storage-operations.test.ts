@@ -4,14 +4,15 @@ import path from "node:path";
 import type Database from "better-sqlite3";
 import { afterEach, describe, expect, it } from "vitest";
 import type { Analysis, Interaction } from "../src/core/domain/analysis.js";
+import type { Decision } from "../src/core/domain/decision.js";
 import type { Dwelling } from "../src/core/domain/dwelling.js";
+import { DEFAULT_MEMBER_ID } from "../src/core/domain/member.js";
 import type { Offer } from "../src/core/domain/offer.js";
 import {
 	closeStore,
 	createSqliteStore,
 	openStore,
 } from "../src/adapters/secondary/storage/sqlite/store.js";
-import { findOffer } from "../src/adapters/secondary/storage/sqlite/offer.js";
 import { listQueue } from "../src/core/services/queue.service.js";
 
 let cleanups: Array<() => void> = [];
@@ -19,6 +20,8 @@ afterEach(() => {
 	for (const cleanup of cleanups) cleanup();
 	cleanups = [];
 });
+
+const MEMBER = DEFAULT_MEMBER_ID;
 
 function testStore(): {
 	database: Database.Database;
@@ -58,10 +61,6 @@ function offerFixture(): Offer {
 		description: "Bright apartment",
 		fetchedAt: "2026-10-04T00:00:00.000Z",
 		versions: [],
-		marketStatus: "seen",
-		userStatus: "none",
-		analyses: [],
-		interactions: [],
 	};
 }
 
@@ -70,13 +69,23 @@ async function seed(
 ): Promise<void> {
 	await store.saveDwelling(dwellingFixture());
 	await store.saveOffer(offerFixture());
+	const decision: Decision = {
+		memberId: MEMBER,
+		offerId: "offer-1",
+		marketStatus: "seen",
+		userStatus: "none",
+	};
+	await store.saveDecision(decision);
 }
 
 describe("queue", () => {
 	it("returns compact rows joined with the dwelling", async () => {
 		const { store } = testStore();
 		await seed(store);
-		const queue = await store.listQueue("seen", 10);
+		const queue = await store.listQueue(MEMBER, {
+			status: "seen",
+			limit: 10,
+		});
 		expect(queue).toHaveLength(1);
 		expect(queue[0]).toMatchObject({
 			id: "offer-1",
@@ -89,19 +98,22 @@ describe("queue", () => {
 			marketStatus: "seen",
 			userStatus: "none",
 		});
-		expect(await store.listQueue("passed", 10)).toEqual([]);
+		expect(
+			await store.listQueue(MEMBER, { status: "passed", limit: 10 }),
+		).toEqual([]);
 	});
 	it("counts offers by status", async () => {
 		const { store } = testStore();
 		await seed(store);
-		expect(await store.countOffersByStatus("seen")).toBe(1);
-		expect(await store.countOffersByStatus("passed")).toBe(0);
+		expect(await store.countOffersByStatus(MEMBER, "seen")).toBe(1);
+		expect(await store.countOffersByStatus(MEMBER, "passed")).toBe(0);
 	});
 	it("lists a page through the service with a total", async () => {
 		const { store } = testStore();
 		await seed(store);
 		const page = await listQueue({
 			store,
+			memberId: MEMBER,
 			input: { status: "seen", limit: 10 },
 		});
 		expect(page.offers).toHaveLength(1);
@@ -123,11 +135,12 @@ describe("verdicts and analyses", () => {
 			.all();
 		expect(rows).toHaveLength(1);
 	});
-	it("appends an analysis and an interaction to the offer", async () => {
-		const { database, store } = testStore();
+	it("appends a member's analysis and interaction on the offer", async () => {
+		const { store } = testStore();
 		await seed(store);
 		const analysis: Analysis = {
 			id: "an-1",
+			memberId: MEMBER,
 			offerId: "offer-1",
 			tier: "triage",
 			verdict: "shortlist",
@@ -139,15 +152,17 @@ describe("verdicts and analyses", () => {
 		};
 		const interaction: Interaction = {
 			id: "in-1",
+			memberId: MEMBER,
 			offerId: "offer-1",
 			action: "favorited",
 			createdAt: "2026-10-04T02:00:00.000Z",
 		};
 		await store.recordAnalysis(analysis);
 		await store.recordInteraction(interaction);
-		const offer = await findOffer(database, "offer-1");
-		expect(offer?.analyses).toEqual([analysis]);
-		expect(offer?.interactions).toEqual([interaction]);
+		expect(await store.listAnalyses(MEMBER, "offer-1")).toEqual([analysis]);
+		expect(await store.listInteractions(MEMBER, "offer-1")).toEqual([
+			interaction,
+		]);
 	});
 });
 

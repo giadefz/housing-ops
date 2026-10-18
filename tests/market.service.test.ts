@@ -3,14 +3,18 @@ import os from "node:os";
 import path from "node:path";
 import type Database from "better-sqlite3";
 import { afterEach, describe, expect, it } from "vitest";
+import { findDecision } from "../src/adapters/secondary/storage/sqlite/decision.js";
+import { saveMember } from "../src/adapters/secondary/storage/sqlite/member.js";
 import { findOffer } from "../src/adapters/secondary/storage/sqlite/offer.js";
 import {
 	closeStore,
 	createSqliteStore,
 	openStore,
 } from "../src/adapters/secondary/storage/sqlite/store.js";
+import type { Decision } from "../src/core/domain/decision.js";
 import type { Dwelling } from "../src/core/domain/dwelling.js";
 import type { PipelineEvent } from "../src/core/domain/events.js";
+import { DEFAULT_MEMBER_ID } from "../src/core/domain/member.js";
 import type { Offer } from "../src/core/domain/offer.js";
 import type { ClockPort } from "../src/core/ports/clock.port.js";
 import type { EventBus } from "../src/core/ports/event-bus.port.js";
@@ -24,6 +28,7 @@ afterEach(() => {
 
 const clock: ClockPort = { now: () => "2026-10-05T00:00:00.000Z" };
 const silentBus: EventBus = { on() {}, async emit() {} };
+const MEMBER = DEFAULT_MEMBER_ID;
 
 function testStore(): {
 	database: Database.Database;
@@ -50,7 +55,7 @@ function dwellingFixture(): Dwelling {
 	};
 }
 
-function offerFixture(marketStatus: Offer["marketStatus"]): Offer {
+function offerFixture(): Offer {
 	return {
 		id: "offer-1",
 		dwellingId: "dw-1",
@@ -63,10 +68,6 @@ function offerFixture(marketStatus: Offer["marketStatus"]): Offer {
 		description: "Bright apartment",
 		fetchedAt: "2026-10-04T00:00:00.000Z",
 		versions: [],
-		marketStatus,
-		userStatus: "none",
-		analyses: [],
-		interactions: [],
 	};
 }
 
@@ -74,24 +75,33 @@ async function seed(
 	store: ReturnType<typeof createSqliteStore>,
 ): Promise<void> {
 	await store.saveDwelling(dwellingFixture());
-	await store.saveOffer(offerFixture("seen"));
+	await store.saveOffer(offerFixture());
+	const decision: Decision = {
+		memberId: MEMBER,
+		offerId: "offer-1",
+		marketStatus: "seen",
+		userStatus: "none",
+	};
+	await store.saveDecision(decision);
 }
 
 describe("markOutcome", () => {
-	it("closes the offer and appends the market event", async () => {
+	it("closes the decision and appends the market event", async () => {
 		const { database, store } = testStore();
 		await seed(store);
 		const closed = await markOutcome({
 			store,
 			clock,
 			events: silentBus,
-			id: "offer-1",
+			memberId: MEMBER,
+			offerId: "offer-1",
 			outcome: "sold",
 		});
 		expect(closed.marketStatus).toBe("sold");
-		expect((await findOffer(database, "offer-1"))?.marketStatus).toBe(
+		expect(findDecision(database, MEMBER, "offer-1")?.marketStatus).toBe(
 			"sold",
 		);
+		expect((await findOffer(database, "offer-1"))?.price.amount).toBe(2200);
 		const events: unknown[] = database
 			.prepare("SELECT outcome, observed_at FROM market_events")
 			.all();
@@ -107,7 +117,8 @@ describe("markOutcome", () => {
 			store,
 			clock,
 			events: silentBus,
-			id: "offer-1",
+			memberId: MEMBER,
+			offerId: "offer-1",
 			outcome: "sold",
 		});
 		await expect(
@@ -115,10 +126,50 @@ describe("markOutcome", () => {
 				store,
 				clock,
 				events: silentBus,
-				id: "offer-1",
+				memberId: MEMBER,
+				offerId: "offer-1",
 				outcome: "let",
 			}),
 		).rejects.toThrow(/transition/);
+	});
+
+	it("closes the listing for every member", async () => {
+		const { database, store } = testStore();
+		await seed(store);
+		await saveMember(database, {
+			id: "bob",
+			name: "Bob",
+			role: "member",
+			createdAt: "2026-10-05T00:00:00.000Z",
+		});
+		await store.saveDecision({
+			memberId: "bob",
+			offerId: "offer-1",
+			marketStatus: "shortlisted",
+			userStatus: "favorited",
+		});
+		const emitted: PipelineEvent[] = [];
+		const bus: EventBus = {
+			on() {},
+			async emit(event) {
+				emitted.push(event);
+			},
+		};
+		await markOutcome({
+			store,
+			clock,
+			events: bus,
+			memberId: MEMBER,
+			offerId: "offer-1",
+			outcome: "sold",
+		});
+		expect(findDecision(database, MEMBER, "offer-1")?.marketStatus).toBe(
+			"sold",
+		);
+		expect(findDecision(database, "bob", "offer-1")?.marketStatus).toBe(
+			"sold",
+		);
+		expect(emitted).toEqual(["offer.closed", "offer.closed"]);
 	});
 
 	it("emits offer.closed", async () => {
@@ -135,7 +186,8 @@ describe("markOutcome", () => {
 			store,
 			clock,
 			events: bus,
-			id: "offer-1",
+			memberId: MEMBER,
+			offerId: "offer-1",
 			outcome: "sold",
 		});
 		expect(emitted).toEqual(["offer.closed"]);

@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import type Database from "better-sqlite3";
-import type { Offer } from "../../../../core/domain/offer.js";
-import type { MarketOutcomeEvent } from "../../../../core/ports/store.port.js";
+import type { MarketOutcomeCommand } from "../../../../core/ports/store.port.js";
+import { writeDecision } from "./decision.js";
 import type { TableDefinition } from "./migrate.js";
 import { writeOffer } from "./offer.js";
 
@@ -19,14 +19,15 @@ CREATE TABLE market_events (
 );`,
 };
 
-/** Closes an offer and appends the market event in one transaction. */
+/** Closes an offer and every member's decision on it, appending the market event in one transaction. */
 export function recordMarketOutcome(
 	database: Database.Database,
-	offer: Offer,
-	event: MarketOutcomeEvent,
+	command: MarketOutcomeCommand,
 ): void {
+	const { offer, decisions, event } = command;
 	const close = database.transaction(() => {
 		writeOffer(database, offer);
+		for (const decision of decisions) writeDecision(database, decision);
 		database
 			.prepare(
 				"INSERT INTO market_events (id, offer_id, outcome, observed_at, run_id) VALUES (?, ?, ?, ?, ?)",

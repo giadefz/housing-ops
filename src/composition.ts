@@ -113,19 +113,38 @@ export async function createApplication(
 		validateWorkspace: () => validateWorkspace(workspace),
 		setup: (input, force) =>
 			setupWorkspace({ input, force, ...setupInputs }),
-		getOffer: (id) =>
-			withStore(storeFactory, root, (store) => getOffer(store, id)),
+		getOffer: (input) =>
+			withStore(storeFactory, root, (store) =>
+				getOffer(store, input.memberId, input.offerId),
+			),
 		listQueue: (input) =>
 			withStore(storeFactory, root, (store) =>
-				listQueue({ store, input }),
+				listQueue({
+					store,
+					memberId: input.memberId,
+					input: input.queue,
+				}),
 			),
-		setVerdict: (id, input) =>
+		setVerdict: (input) =>
 			withStore(storeFactory, root, (store) =>
-				setVerdict({ store, clock, events, id, input }),
+				setVerdict({
+					store,
+					clock,
+					events,
+					memberId: input.memberId,
+					offerId: input.offerId,
+					input: input.verdict,
+				}),
 			),
-		interact: (id, input) =>
+		interact: (input) =>
 			withStore(storeFactory, root, (store) =>
-				interact({ store, clock, id, input }),
+				interact({
+					store,
+					clock,
+					memberId: input.memberId,
+					offerId: input.offerId,
+					input: input.interaction,
+				}),
 			),
 		getProfile: (input) => ({
 			path: input.path ?? null,
@@ -143,17 +162,23 @@ export async function createApplication(
 				value: readProfileValue(updated, input.path),
 			};
 		},
-		getDigest: () =>
+		getDigest: (input) =>
 			withStore(storeFactory, root, (store) =>
 				buildDigest({
 					store,
 					clock,
 					profile: parseProfile(profileText),
+					memberId: input.memberId,
 				}),
 			),
 		publishNow: (input) =>
 			withStore(storeFactory, root, (store) =>
-				publishNow({ store, events, input }),
+				publishNow({
+					store,
+					events,
+					memberId: input.memberId,
+					input: input.publish,
+				}),
 			),
 		listProviders: () => listProviderSummaries(providersText),
 		listFilters: () => listFilters(pipelineText, pack.code, filters),
@@ -162,7 +187,7 @@ export async function createApplication(
 				checkFilterPort({ filters, profileText, id, store }),
 			),
 		testProvider: (id) => runProviderTest(providerTrial(providersText, id)),
-		scan: (providerId) =>
+		scan: (input) =>
 			withStore(storeFactory, root, (store) =>
 				scan(
 					scanDependencies(
@@ -174,8 +199,9 @@ export async function createApplication(
 							pack,
 							clock,
 							filters,
+							memberId: input.memberId,
 						},
-						providerId,
+						input.providerId,
 						store,
 					),
 				),
@@ -256,6 +282,7 @@ interface ScanInputs {
 	pack: CountryPack;
 	clock: ClockPort;
 	filters: Map<string, FilterPort>;
+	memberId: string;
 }
 
 function scanDependencies(
@@ -271,6 +298,7 @@ function scanDependencies(
 		pack,
 		clock,
 		filters,
+		memberId,
 	} = inputs;
 	const providers = selectProviders(
 		buildProviders(providersText),
@@ -287,6 +315,7 @@ function scanDependencies(
 		clock,
 		profile: parseProfile(profileText),
 		filters: buildFilterStages(pipelineText, pack.code, filters),
+		memberId,
 	};
 }
 

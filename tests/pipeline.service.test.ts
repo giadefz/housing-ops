@@ -35,10 +35,6 @@ function offer(overrides: Partial<Offer> = {}): Offer {
 		description: "",
 		fetchedAt: "2026-10-04T00:00:00.000Z",
 		versions: [],
-		marketStatus: "seen",
-		userStatus: "none",
-		analyses: [],
-		interactions: [],
 		...overrides,
 	};
 }

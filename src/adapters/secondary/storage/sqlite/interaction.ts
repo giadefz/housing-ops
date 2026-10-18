@@ -21,6 +21,7 @@ CREATE TABLE interactions (
 
 const InteractionRecordSchema = z.object({
 	id: z.string(),
+	member_id: z.string(),
 	offer_id: z.string(),
 	action: z.string(),
 	reason: z.string().nullable(),
@@ -33,6 +34,7 @@ export type InteractionRecord = z.infer<typeof InteractionRecordSchema>;
 function toRecord(interaction: Interaction): InteractionRecord {
 	return {
 		id: interaction.id,
+		member_id: interaction.memberId,
 		offer_id: interaction.offerId,
 		action: interaction.action,
 		reason: interaction.reason ?? null,
@@ -51,6 +53,7 @@ function toDomain(record: unknown): Interaction {
 	const valid = parsed.data;
 	return {
 		id: valid.id,
+		memberId: valid.member_id,
 		offerId: valid.offer_id,
 		action: parseEnum(
 			"interactions",
@@ -72,10 +75,11 @@ export async function recordInteraction(
 	const record = toRecord(interaction);
 	database
 		.prepare(
-			"INSERT INTO interactions (id, offer_id, action, reason, created_at) VALUES (?, ?, ?, ?, ?)",
+			"INSERT INTO interactions (id, member_id, offer_id, action, reason, created_at) VALUES (?, ?, ?, ?, ?, ?)",
 		)
 		.run(
 			record.id,
+			record.member_id,
 			record.offer_id,
 			record.action,
 			record.reason,
@@ -83,15 +87,16 @@ export async function recordInteraction(
 		);
 }
 
-/** Lists an offer's interactions in order. */
+/** Lists a member's interactions on an offer, in order. */
 export function listInteractions(
 	database: Database.Database,
+	memberId: string,
 	offerId: string,
 ): Interaction[] {
 	const records: unknown[] = database
 		.prepare(
-			"SELECT * FROM interactions WHERE offer_id = ? ORDER BY created_at",
+			"SELECT * FROM interactions WHERE member_id = ? AND offer_id = ? ORDER BY created_at",
 		)
-		.all(offerId);
+		.all(memberId, offerId);
 	return records.map((record) => toDomain(record));
 }

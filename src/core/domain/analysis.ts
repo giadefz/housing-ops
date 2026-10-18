@@ -47,6 +47,7 @@ export const INTERACTION_ACTIONS = [
 /** A recorded judgment on one offer, cheap or deep. */
 export interface Analysis {
 	id: string;
+	memberId: string;
 	offerId: string;
 	tier: AnalysisTier;
 	verdict: AnalysisVerdict;
@@ -64,6 +65,7 @@ export interface Analysis {
 /** A recorded user reaction on one offer. */
 export interface Interaction {
 	id: string;
+	memberId: string;
 	offerId: string;
 	action: (typeof INTERACTION_ACTIONS)[number];
 	reason?: string;

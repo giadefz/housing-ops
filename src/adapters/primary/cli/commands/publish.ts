@@ -1,5 +1,6 @@
 import { PublishInputSchema } from "../../../../core/schemas/requests.js";
 import { fail, ok } from "../envelope.js";
+import { CLI_MEMBER_ID } from "../identity.js";
 import { readNumber, readString } from "./flags.js";
 import type { CommandHandler } from "./types.js";
 
@@ -16,6 +17,11 @@ export const publishCommands: Record<string, CommandHandler> = {
 		});
 		if (!parsed.success)
 			return fail({ code: "VALIDATION", message: parsed.error.message });
-		return ok(await app.publishNow(parsed.data));
+		return ok(
+			await app.publishNow({
+				memberId: CLI_MEMBER_ID,
+				publish: parsed.data,
+			}),
+		);
 	},
 };

@@ -8,7 +8,9 @@ import {
 	createSqliteStore,
 	openStore,
 } from "../src/adapters/secondary/storage/sqlite/store.js";
+import type { Decision, MarketStatus } from "../src/core/domain/decision.js";
 import type { Dwelling } from "../src/core/domain/dwelling.js";
+import { DEFAULT_MEMBER_ID } from "../src/core/domain/member.js";
 import type { Offer } from "../src/core/domain/offer.js";
 import type { ClockPort } from "../src/core/ports/clock.port.js";
 import { interact } from "../src/core/services/interaction.service.js";
@@ -20,6 +22,7 @@ afterEach(() => {
 });
 
 const clock: ClockPort = { now: () => "2026-10-07T00:00:00.000Z" };
+const MEMBER = DEFAULT_MEMBER_ID;
 
 function testStore(): {
 	database: Database.Database;
@@ -46,7 +49,7 @@ function dwellingFixture(): Dwelling {
 	};
 }
 
-function offerFixture(marketStatus: Offer["marketStatus"]): Offer {
+function offerFixture(): Offer {
 	return {
 		id: "offer-1",
 		dwellingId: "dw-1",
@@ -59,36 +62,41 @@ function offerFixture(marketStatus: Offer["marketStatus"]): Offer {
 		description: "Bright apartment",
 		fetchedAt: "2026-10-04T00:00:00.000Z",
 		versions: [],
-		marketStatus,
-		userStatus: "none",
-		analyses: [],
-		interactions: [],
 	};
 }
 
 async function seed(
-	marketStatus: Offer["marketStatus"],
+	marketStatus: MarketStatus,
 ): Promise<ReturnType<typeof createSqliteStore>> {
 	const { store } = testStore();
 	await store.saveDwelling(dwellingFixture());
-	await store.saveOffer(offerFixture(marketStatus));
+	await store.saveOffer(offerFixture());
+	const decision: Decision = {
+		memberId: MEMBER,
+		offerId: "offer-1",
+		marketStatus,
+		userStatus: "none",
+	};
+	await store.saveDecision(decision);
 	return store;
 }
 
 describe("interact", () => {
-	it("records a favorite and moves the offer", async () => {
+	it("records a favorite and moves the decision", async () => {
 		const store = await seed("passed");
 		const result = await interact({
 			store,
 			clock,
-			id: "offer-1",
+			memberId: MEMBER,
+			offerId: "offer-1",
 			input: { action: "favorited" },
 		});
-		const loaded = await store.findOffer("offer-1");
-		expect(loaded?.userStatus).toBe("favorited");
-		expect(loaded?.interactions).toHaveLength(1);
-		expect(loaded?.interactions[0]).toMatchObject({ action: "favorited" });
-		expect(result.interactionId).toBe(loaded?.interactions[0]?.id);
+		const decision = await store.findDecision(MEMBER, "offer-1");
+		const interactions = await store.listInteractions(MEMBER, "offer-1");
+		expect(decision?.userStatus).toBe("favorited");
+		expect(interactions).toHaveLength(1);
+		expect(interactions[0]).toMatchObject({ action: "favorited" });
+		expect(result.interactionId).toBe(interactions[0]?.id);
 		expect(result.userStatus).toBe("favorited");
 	});
 
@@ -97,13 +105,15 @@ describe("interact", () => {
 		const result = await interact({
 			store,
 			clock,
-			id: "offer-1",
+			memberId: MEMBER,
+			offerId: "offer-1",
 			input: { action: "shared" },
 		});
-		const loaded = await store.findOffer("offer-1");
+		const decision = await store.findDecision(MEMBER, "offer-1");
+		const interactions = await store.listInteractions(MEMBER, "offer-1");
 		expect(result.userStatus).toBe("none");
-		expect(loaded?.marketStatus).toBe("passed");
-		expect(loaded?.interactions[0]).toMatchObject({ action: "shared" });
+		expect(decision?.marketStatus).toBe("passed");
+		expect(interactions[0]).toMatchObject({ action: "shared" });
 	});
 
 	it("records a rejection with a reason", async () => {
@@ -111,12 +121,14 @@ describe("interact", () => {
 		await interact({
 			store,
 			clock,
-			id: "offer-1",
+			memberId: MEMBER,
+			offerId: "offer-1",
 			input: { action: "rejected", reason: "too small" },
 		});
-		const loaded = await store.findOffer("offer-1");
-		expect(loaded?.userStatus).toBe("rejected_by_user");
-		expect(loaded?.interactions[0]).toMatchObject({
+		const decision = await store.findDecision(MEMBER, "offer-1");
+		const interactions = await store.listInteractions(MEMBER, "offer-1");
+		expect(decision?.userStatus).toBe("rejected_by_user");
+		expect(interactions[0]).toMatchObject({
 			action: "rejected",
 			reason: "too small",
 		});
@@ -128,7 +140,8 @@ describe("interact", () => {
 			interact({
 				store,
 				clock,
-				id: "offer-1",
+				memberId: MEMBER,
+				offerId: "offer-1",
 				input: { action: "favorited" },
 			}),
 		).rejects.toThrow(/transition/);

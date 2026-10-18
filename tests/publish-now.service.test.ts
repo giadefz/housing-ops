@@ -8,9 +8,11 @@ import {
 	createSqliteStore,
 	openStore,
 } from "../src/adapters/secondary/storage/sqlite/store.js";
+import type { Decision, MarketStatus } from "../src/core/domain/decision.js";
 import type { Dwelling } from "../src/core/domain/dwelling.js";
 import type { PipelineEvent } from "../src/core/domain/events.js";
-import type { MarketStatus, Offer } from "../src/core/domain/offer.js";
+import { DEFAULT_MEMBER_ID } from "../src/core/domain/member.js";
+import type { Offer } from "../src/core/domain/offer.js";
 import type { EventBus } from "../src/core/ports/event-bus.port.js";
 import type { OfferStorePort } from "../src/core/ports/store.port.js";
 import { publishNow } from "../src/core/services/publish.service.js";
@@ -20,6 +22,8 @@ afterEach(() => {
 	for (const cleanup of cleanups) cleanup();
 	cleanups = [];
 });
+
+const MEMBER = DEFAULT_MEMBER_ID;
 
 function testStore(): {
 	database: Database.Database;
@@ -46,7 +50,7 @@ function dwellingFixture(): Dwelling {
 	};
 }
 
-function offerFixture(id: string, marketStatus: MarketStatus): Offer {
+function offerFixture(id: string): Offer {
 	return {
 		id,
 		dwellingId: "dw-1",
@@ -59,11 +63,22 @@ function offerFixture(id: string, marketStatus: MarketStatus): Offer {
 		description: "Bright apartment",
 		fetchedAt: "2026-10-04T00:00:00.000Z",
 		versions: [],
+	};
+}
+
+async function seed(
+	store: OfferStorePort,
+	id: string,
+	marketStatus: MarketStatus,
+): Promise<void> {
+	await store.saveOffer(offerFixture(id));
+	const decision: Decision = {
+		memberId: MEMBER,
+		offerId: id,
 		marketStatus,
 		userStatus: "none",
-		analyses: [],
-		interactions: [],
 	};
+	await store.saveDecision(decision);
 }
 
 function spyBus(): { bus: EventBus; emitted: PipelineEvent[] } {
@@ -81,13 +96,14 @@ describe("publishNow", () => {
 	it("re-delivers offer.passed over passed and pending offers", async () => {
 		const { store } = testStore();
 		await store.saveDwelling(dwellingFixture());
-		await store.saveOffer(offerFixture("a", "passed"));
-		await store.saveOffer(offerFixture("b", "pending"));
-		await store.saveOffer(offerFixture("c", "seen"));
+		await seed(store, "a", "passed");
+		await seed(store, "b", "pending");
+		await seed(store, "c", "seen");
 		const { bus, emitted } = spyBus();
 		const result = await publishNow({
 			store,
 			events: bus,
+			memberId: MEMBER,
 			input: { event: "offer.passed", limit: 20 },
 		});
 		expect(result).toEqual({ event: "offer.passed", published: 2 });
@@ -97,12 +113,13 @@ describe("publishNow", () => {
 	it("honours the limit", async () => {
 		const { store } = testStore();
 		await store.saveDwelling(dwellingFixture());
-		await store.saveOffer(offerFixture("a", "shortlisted"));
-		await store.saveOffer(offerFixture("b", "shortlisted"));
+		await seed(store, "a", "shortlisted");
+		await seed(store, "b", "shortlisted");
 		const { bus } = spyBus();
 		const result = await publishNow({
 			store,
 			events: bus,
+			memberId: MEMBER,
 			input: { event: "offer.shortlisted", limit: 1 },
 		});
 		expect(result).toEqual({ event: "offer.shortlisted", published: 1 });

@@ -4,9 +4,12 @@ import { toSquareMeters } from "../../../../core/domain/dwelling.js";
 import {
 	MARKET_STATUSES,
 	USER_STATUSES,
-} from "../../../../core/domain/offer.js";
-import type { MarketStatus } from "../../../../core/domain/offer.js";
-import type { OfferSummary } from "../../../../core/ports/store.port.js";
+	type MarketStatus,
+} from "../../../../core/domain/decision.js";
+import type {
+	OfferStatusQuery,
+	OfferSummary,
+} from "../../../../core/ports/store.port.js";
 import {
 	CorruptRecordError,
 	parseEnum,
@@ -27,32 +30,36 @@ const QueueRecordSchema = z.object({
 	layout: z.string(),
 });
 
-/** Queue projection over offers joined to their dwelling. Compact records only. */
+/** Queue projection over a member's decisions joined to their offer's dwelling. */
 export function listQueue(
 	database: Database.Database,
-	status: MarketStatus,
-	limit: number,
+	memberId: string,
+	query: OfferStatusQuery,
 ): OfferSummary[] {
 	const records: unknown[] = database
 		.prepare(
-			`SELECT o.id AS id, o.provider AS provider, o.price AS price, o.status AS status,
-			o.user_status AS user_status, o.fetched_at AS fetched_at,
+			`SELECT o.id AS id, o.provider AS provider, o.price AS price, dec.market_status AS status,
+			dec.user_status AS user_status, o.fetched_at AS fetched_at,
 			d.address AS address, d.size AS size, d.rooms AS rooms, d.layout AS layout
-			FROM offers o JOIN dwellings d ON d.id = o.dwelling_id
-			WHERE o.status = ? ORDER BY o.fetched_at LIMIT ?`,
+			FROM decisions dec JOIN offers o ON o.id = dec.offer_id
+			JOIN dwellings d ON d.id = o.dwelling_id
+			WHERE dec.member_id = ? AND dec.market_status = ? ORDER BY o.fetched_at LIMIT ?`,
 		)
-		.all(status, limit);
+		.all(memberId, query.status, query.limit);
 	return records.map((record) => toSummary(record));
 }
 
-/** Counts offers with the given market status. */
+/** Counts a member's offers with the given market status. */
 export function countOffersByStatus(
 	database: Database.Database,
+	memberId: string,
 	status: MarketStatus,
 ): number {
 	const record: unknown = database
-		.prepare("SELECT COUNT(*) AS count FROM offers WHERE status = ?")
-		.get(status);
+		.prepare(
+			"SELECT COUNT(*) AS count FROM decisions WHERE member_id = ? AND market_status = ?",
+		)
+		.get(memberId, status);
 	return countOf(record);
 }
 
@@ -68,11 +75,13 @@ function countOf(record: unknown): number {
 	return 0;
 }
 
+/** The price shape as stored in the offers table. */
 interface StoredPrice {
 	amount: number;
 	currency: string;
 }
 
+/** Projects one queue record into a compact offer summary, or throws when malformed. */
 export function toSummary(record: unknown): OfferSummary {
 	const parsed = QueueRecordSchema.safeParse(record);
 	if (!parsed.success)

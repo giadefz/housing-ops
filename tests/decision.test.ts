@@ -5,39 +5,29 @@ import {
 	recordJudgment,
 	recordMarketEvent,
 	recordUserAction,
-	type Offer,
-} from "../src/core/domain/offer.js";
+	type Decision,
+	type MarketStatus,
+} from "../src/core/domain/decision.js";
 
-function seenOffer(): Offer {
+function seen(): Decision {
 	return {
-		id: "offer-1",
-		dwellingId: "dw-1",
-		provider: "daft",
-		listingId: "abc",
-		url: "https://example.invalid/abc",
-		market: "rent",
-		price: { amount: 2200, currency: "EUR", period: "month" },
-		images: [],
-		description: "Bright apartment",
-		fetchedAt: "2026-10-04T00:00:00.000Z",
-		versions: [],
+		memberId: "local",
+		offerId: "offer-1",
 		marketStatus: "seen",
 		userStatus: "none",
-		analyses: [],
-		interactions: [],
 	};
 }
 
-function inMarket(status: Offer["marketStatus"]): Offer {
-	return { ...seenOffer(), marketStatus: status };
+function inMarket(status: MarketStatus): Decision {
+	return { ...seen(), marketStatus: status };
 }
 
 describe("filter gate transitions", () => {
-	it("clears seen offers straight to passed", () => {
-		expect(clearFilters(seenOffer()).marketStatus).toBe("passed");
+	it("clears seen decisions straight to passed", () => {
+		expect(clearFilters(seen()).marketStatus).toBe("passed");
 	});
-	it("parks seen offers as pending when gated", () => {
-		expect(parkForJudgment(seenOffer()).marketStatus).toBe("pending");
+	it("parks seen decisions as pending when gated", () => {
+		expect(parkForJudgment(seen()).marketStatus).toBe("pending");
 	});
 	it("rejects gate transitions from any other status", () => {
 		expect(() => clearFilters(inMarket("passed"))).toThrow(/transition/);

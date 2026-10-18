@@ -8,7 +8,10 @@ import {
 	createSqliteStore,
 	openStore,
 } from "../src/adapters/secondary/storage/sqlite/store.js";
+import { saveMember } from "../src/adapters/secondary/storage/sqlite/member.js";
 import type { Dwelling } from "../src/core/domain/dwelling.js";
+import type { Decision } from "../src/core/domain/decision.js";
+import { DEFAULT_MEMBER_ID } from "../src/core/domain/member.js";
 import type { Offer } from "../src/core/domain/offer.js";
 import type { ClockPort } from "../src/core/ports/clock.port.js";
 import type { OfferStorePort } from "../src/core/ports/store.port.js";
@@ -22,6 +25,7 @@ afterEach(() => {
 });
 
 const clock: ClockPort = { now: () => "2026-10-07T00:00:00.000Z" };
+const MEMBER = DEFAULT_MEMBER_ID;
 
 function testStore(): {
 	database: Database.Database;
@@ -61,10 +65,6 @@ function offerFixture(id: string, amount: number): Offer {
 		description: "Bright apartment",
 		fetchedAt: "2026-10-04T00:00:00.000Z",
 		versions: [],
-		marketStatus: "seen",
-		userStatus: "none",
-		analyses: [],
-		interactions: [],
 	};
 }
 
@@ -83,6 +83,15 @@ async function seed(store: OfferStorePort): Promise<void> {
 	await store.saveDwelling(dwellingFixture());
 	await store.saveOffer(offerFixture("a", 2000));
 	await store.saveOffer(offerFixture("b", 1500));
+	for (const offerId of ["a", "b"]) {
+		const decision: Decision = {
+			memberId: MEMBER,
+			offerId,
+			marketStatus: "seen",
+			userStatus: "none",
+		};
+		await store.saveDecision(decision);
+	}
 }
 
 describe("buildDigest", () => {
@@ -91,12 +100,14 @@ describe("buildDigest", () => {
 		await seed(store);
 		await store.recordInteraction({
 			id: "i1",
+			memberId: MEMBER,
 			offerId: "a",
 			action: "favorited",
 			createdAt: "2026-10-07T00:00:00.000Z",
 		});
 		await store.recordInteraction({
 			id: "i2",
+			memberId: MEMBER,
 			offerId: "b",
 			action: "rejected",
 			reason: "too small",
@@ -104,11 +115,17 @@ describe("buildDigest", () => {
 		});
 		await store.recordInteraction({
 			id: "i3",
+			memberId: MEMBER,
 			offerId: "a",
 			action: "viewed",
 			createdAt: "2026-10-07T00:00:00.000Z",
 		});
-		const digest = await buildDigest({ store, clock, profile: profile() });
+		const digest = await buildDigest({
+			store,
+			clock,
+			profile: profile(),
+			memberId: MEMBER,
+		});
 		expect(digest.stats.favorited.count).toBe(1);
 		expect(digest.stats.favorited.offers[0]).toMatchObject({
 			id: "a",
@@ -139,11 +156,56 @@ describe("buildDigest", () => {
 
 	it("returns empty bands when nothing is stored", async () => {
 		const { store } = testStore();
-		const digest = await buildDigest({ store, clock, profile: profile() });
+		const digest = await buildDigest({
+			store,
+			clock,
+			profile: profile(),
+			memberId: MEMBER,
+		});
 		expect(digest.stats.favorited.count).toBe(0);
 		expect(digest.stats.priceBands).toEqual({
 			favorited: null,
 			overall: null,
+		});
+	});
+
+	it("scopes the overall price band to the member", async () => {
+		const { store, database } = testStore();
+		await seed(store);
+		await saveMember(database, {
+			id: "bob",
+			name: "Bob",
+			role: "member",
+			createdAt: "2026-10-07T00:00:00.000Z",
+		});
+		await store.saveOffer(offerFixture("c", 9000));
+		await store.saveDecision({
+			memberId: "bob",
+			offerId: "c",
+			marketStatus: "seen",
+			userStatus: "none",
+		});
+		const mine = await buildDigest({
+			store,
+			clock,
+			profile: profile(),
+			memberId: MEMBER,
+		});
+		expect(mine.stats.priceBands.overall).toEqual({
+			min: 1500,
+			median: 1750,
+			max: 2000,
+		});
+		const theirs = await buildDigest({
+			store,
+			clock,
+			profile: profile(),
+			memberId: "bob",
+		});
+		expect(theirs.stats.priceBands.overall).toEqual({
+			min: 9000,
+			median: 9000,
+			max: 9000,
 		});
 	});
 });

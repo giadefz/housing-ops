@@ -9,10 +9,13 @@ import {
 	createSqliteStore,
 	openStore,
 } from "../src/adapters/secondary/storage/sqlite/store.js";
+import { findDecision } from "../src/adapters/secondary/storage/sqlite/decision.js";
 import { findOfferByListing } from "../src/adapters/secondary/storage/sqlite/offer.js";
 import { irelandPack } from "../src/countries/ie/pack.js";
+import type { Decision } from "../src/core/domain/decision.js";
 import type { PipelineEvent } from "../src/core/domain/events.js";
 import type { Listing } from "../src/core/domain/listing.js";
+import { DEFAULT_MEMBER_ID } from "../src/core/domain/member.js";
 import { budgetFilter } from "../src/core/filters/budget.js";
 import type { ClockPort } from "../src/core/ports/clock.port.js";
 import type { EventBus } from "../src/core/ports/event-bus.port.js";
@@ -33,6 +36,7 @@ afterEach(() => {
 const clock: ClockPort = { now: () => "2026-10-04T00:00:00.000Z" };
 const budgetStage: FilterStage = { filter: budgetFilter, missing: "fail" };
 const silentBus: EventBus = { on() {}, async emit() {} };
+const MEMBER = DEFAULT_MEMBER_ID;
 
 function testDatabase(): Database.Database {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), "housing-ops-"));
@@ -83,6 +87,15 @@ function verdicts(database: Database.Database): unknown[] {
 	return database.prepare("SELECT filter_id, outcome FROM verdicts").all();
 }
 
+async function decisionFor(
+	database: Database.Database,
+	listingId: string,
+	provider = "fake",
+): Promise<Decision | null> {
+	const offer = await findOfferByListing(database, provider, listingId);
+	return offer === null ? null : findDecision(database, MEMBER, offer.id);
+}
+
 describe("scan", () => {
 	it("normalizes, filters, and stores a passing listing as passed", async () => {
 		const database = testDatabase();
@@ -95,10 +108,10 @@ describe("scan", () => {
 			clock,
 			profile: profile(),
 			filters: [budgetStage],
+			memberId: MEMBER,
 		});
 		expect(result).toEqual({ fetched: 1, stored: 1, deadLettered: 0 });
-		const offer = await findOfferByListing(database, "fake", "a");
-		expect(offer?.marketStatus).toBe("passed");
+		expect((await decisionFor(database, "a"))?.marketStatus).toBe("passed");
 		expect(verdicts(database)).toEqual([
 			{ filter_id: "budget", outcome: "pass" },
 		]);
@@ -115,9 +128,11 @@ describe("scan", () => {
 			clock,
 			profile: profile({ gate: true }),
 			filters: [budgetStage],
+			memberId: MEMBER,
 		});
-		const offer = await findOfferByListing(database, "fake", "a");
-		expect(offer?.marketStatus).toBe("pending");
+		expect((await decisionFor(database, "a"))?.marketStatus).toBe(
+			"pending",
+		);
 	});
 
 	it("leaves a filtered-out offer seen and records the failing verdict", async () => {
@@ -131,9 +146,9 @@ describe("scan", () => {
 			clock,
 			profile: profile({ budget: { max: 1000, currency: "EUR" } }),
 			filters: [budgetStage],
+			memberId: MEMBER,
 		});
-		const offer = await findOfferByListing(database, "fake", "a");
-		expect(offer?.marketStatus).toBe("seen");
+		expect((await decisionFor(database, "a"))?.marketStatus).toBe("seen");
 		expect(verdicts(database)).toEqual([
 			{ filter_id: "budget", outcome: "fail" },
 		]);
@@ -150,6 +165,7 @@ describe("scan", () => {
 			clock,
 			profile: profile(),
 			filters: [budgetStage],
+			memberId: MEMBER,
 		});
 		expect(result).toEqual({ fetched: 2, stored: 1, deadLettered: 1 });
 		const dead: unknown[] = database
@@ -169,6 +185,7 @@ describe("scan", () => {
 			clock,
 			profile: profile(),
 			filters: [budgetStage],
+			memberId: MEMBER,
 		};
 		await scan(dependencies);
 		await scan(dependencies);
@@ -190,6 +207,7 @@ describe("scan", () => {
 			clock,
 			profile: profile(),
 			filters: [budgetStage],
+			memberId: MEMBER,
 		};
 		await scan({ ...base, providers: [providerOf([listing("a")])] });
 		await scan({
@@ -237,6 +255,7 @@ describe("scan", () => {
 			clock,
 			profile: profile(),
 			filters: [budgetStage],
+			memberId: MEMBER,
 		});
 		const dwellings: unknown[] = database
 			.prepare("SELECT id FROM dwellings")
@@ -277,6 +296,7 @@ describe("scan publishing", () => {
 			clock,
 			profile: profile(),
 			filters: [budgetStage],
+			memberId: MEMBER,
 		});
 		expect(emitted).toEqual(["offer.passed"]);
 	});
@@ -292,6 +312,7 @@ describe("scan publishing", () => {
 			clock,
 			profile: profile(),
 			filters: [budgetStage],
+			memberId: MEMBER,
 		};
 		await scan({ ...base, providers: [providerOf([listing("a")])] });
 		await scan({
@@ -326,6 +347,7 @@ describe("scan publishing", () => {
 			clock,
 			profile: profile(),
 			filters: [budgetStage],
+			memberId: MEMBER,
 		});
 		expect(result.stored).toBe(1);
 	});
@@ -343,9 +365,9 @@ describe("scan gate", () => {
 			clock,
 			profile: profile({ gate: false }),
 			filters: [budgetStage],
+			memberId: MEMBER,
 		});
-		const offer = await findOfferByListing(database, "fake", "a");
-		expect(offer?.marketStatus).toBe("passed");
+		expect((await decisionFor(database, "a"))?.marketStatus).toBe("passed");
 	});
 
 	it("parks a passing offer as pending when the gate is on, and still emits offer.passed", async () => {
@@ -366,9 +388,11 @@ describe("scan gate", () => {
 			clock,
 			profile: profile({ gate: true }),
 			filters: [budgetStage],
+			memberId: MEMBER,
 		});
-		const offer = await findOfferByListing(database, "fake", "a");
-		expect(offer?.marketStatus).toBe("pending");
+		expect((await decisionFor(database, "a"))?.marketStatus).toBe(
+			"pending",
+		);
 		expect(emitted).toEqual(["offer.passed"]);
 	});
 });

@@ -68,10 +68,6 @@ function offerFixture(): Offer {
 				payload: { source: "test" },
 			},
 		],
-		marketStatus: "seen",
-		userStatus: "none",
-		analyses: [],
-		interactions: [],
 	};
 }
 
@@ -135,7 +131,6 @@ describe("offers", () => {
 			...offerFixture(),
 			price: { amount: 2100, currency: "EUR", period: "month" as const },
 			fetchedAt: "2026-10-05T00:00:00.000Z",
-			marketStatus: "passed" as const,
 			versions: [
 				...offerFixture().versions,
 				{
@@ -154,6 +149,5 @@ describe("offers", () => {
 		const updated = await findOffer(database, "offer-1");
 		expect(updated?.versions).toHaveLength(2);
 		expect(updated?.price.amount).toBe(2100);
-		expect(updated?.marketStatus).toBe("passed");
 	});
 });

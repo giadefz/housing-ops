@@ -4,6 +4,7 @@ import {
 	ProfileSetSchema,
 } from "../../../../core/schemas/requests.js";
 import { fail, ok } from "../envelope.js";
+import { CLI_MEMBER_ID } from "../identity.js";
 import { readString } from "./flags.js";
 import type { CommandHandler } from "./types.js";
 
@@ -16,7 +17,8 @@ const INVALID_JSON: unique symbol = Symbol("invalid-json");
 export const profileCommands: Record<string, CommandHandler> = {
 	profile: async (app, args) => {
 		const [subcommand, path, raw] = args.rest;
-		if (subcommand === "digest") return ok(await app.getDigest());
+		if (subcommand === "digest")
+			return ok(await app.getDigest({ memberId: CLI_MEMBER_ID }));
 		if (subcommand === "get") return readProfile(app, path);
 		if (subcommand === "set" && raw !== undefined)
 			return updateProfile(app, path, raw);

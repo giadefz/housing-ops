@@ -1,4 +1,5 @@
 import { fail, ok } from "../envelope.js";
+import { CLI_MEMBER_ID } from "../identity.js";
 import type { CommandHandler } from "./types.js";
 
 /** Offer commands: read one offer with everything recorded against it. */
@@ -11,6 +12,6 @@ export const offerCommands: Record<string, CommandHandler> = {
 				message: "usage: housing-ops offer get <id>",
 			});
 		}
-		return ok(await app.getOffer(id));
+		return ok(await app.getOffer({ memberId: CLI_MEMBER_ID, offerId: id }));
 	},
 };

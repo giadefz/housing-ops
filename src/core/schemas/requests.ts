@@ -4,7 +4,7 @@ import {
 	ANALYSIS_VERDICTS,
 	INTERACTION_ACTIONS,
 } from "../domain/analysis.js";
-import { MARKET_STATUSES } from "../domain/offer.js";
+import { MARKET_STATUSES } from "../domain/decision.js";
 
 /** A verdict set request: a tier, a verdict, and its evidence. */
 export const VerdictInputSchema = z.object({

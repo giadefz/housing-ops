@@ -18,10 +18,6 @@ function offer(id: string, amount: number): Offer {
 		description: "",
 		fetchedAt: "2026-10-04T00:00:00.000Z",
 		versions: [],
-		marketStatus: "seen",
-		userStatus: "none",
-		analyses: [],
-		interactions: [],
 	};
 }
 

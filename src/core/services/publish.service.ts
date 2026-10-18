@@ -1,7 +1,7 @@
-import type { MarketStatus, Offer } from "../domain/offer.js";
+import type { MarketStatus } from "../domain/decision.js";
 import type { PublishResult } from "../ports/application.port.js";
 import type { EventBus } from "../ports/event-bus.port.js";
-import type { OfferStorePort } from "../ports/store.port.js";
+import type { MemberOffer, OfferStorePort } from "../ports/store.port.js";
 import type { PublishInput } from "../schemas/requests.js";
 
 /** The market statuses each re-publishable event selects. */
@@ -12,32 +12,41 @@ const EVENT_STATUSES: Record<PublishInput["event"], MarketStatus[]> = {
 	"offer.closed": ["let", "sold", "gone"],
 };
 
-/** One request to re-deliver an event over stored offers. */
+/** One request to re-deliver an event over a member's stored offers. */
 export interface PublishNowRequest {
 	store: OfferStorePort;
 	events: EventBus;
+	memberId: string;
 	input: PublishInput;
 }
 
-/** Re-delivers an event for every stored offer currently in the matching state. */
+/** Re-delivers an event for every member offer currently in the matching state. */
 export async function publishNow(
 	request: PublishNowRequest,
 ): Promise<PublishResult> {
-	const { store, events, input } = request;
-	const offers = await eligibleOffers(store, input);
-	for (const offer of offers) await events.emit(input.event, { offer });
-	return { event: input.event, published: offers.length };
+	const { store, events, memberId, input } = request;
+	const members = await eligibleOffers(store, memberId, input);
+	for (const { offer, decision } of members) {
+		await events.emit(input.event, { offer, decision });
+	}
+	return { event: input.event, published: members.length };
 }
 
 async function eligibleOffers(
 	store: OfferStorePort,
+	memberId: string,
 	input: PublishInput,
-): Promise<Offer[]> {
-	const offers: Offer[] = [];
+): Promise<MemberOffer[]> {
+	const members: MemberOffer[] = [];
 	for (const status of EVENT_STATUSES[input.event]) {
-		const remaining = input.limit - offers.length;
+		const remaining = input.limit - members.length;
 		if (remaining <= 0) break;
-		offers.push(...(await store.listOffersByStatus(status, remaining)));
+		members.push(
+			...(await store.listMemberOffers(memberId, {
+				status,
+				limit: remaining,
+			})),
+		);
 	}
-	return offers;
+	return members;
 }

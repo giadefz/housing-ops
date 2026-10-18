@@ -7,50 +7,67 @@ import type {
 import { toSummary } from "./queue.js";
 
 const FAVORITED =
-	"(SELECT offer_id FROM interactions WHERE action = 'favorited')";
+	"(SELECT offer_id FROM interactions WHERE member_id = ? AND action = 'favorited')";
 
 /** Gathers every aggregate the profile digest needs, at call time. */
-export function loadDigest(database: Database.Database): DigestData {
+export function loadDigest(
+	database: Database.Database,
+	memberId: string,
+): DigestData {
 	return {
-		favorited: favoritedSummaries(database),
+		favorited: favoritedSummaries(database, memberId),
 		rejectedCount: scalar(
 			database,
-			"SELECT COUNT(*) AS n FROM interactions WHERE action = 'rejected'",
+			"SELECT COUNT(*) AS n FROM interactions WHERE member_id = ? AND action = 'rejected'",
+			memberId,
 		),
 		rejectedReasons: featureCounts(
 			database,
 			`SELECT reason AS value, COUNT(*) AS n FROM interactions
-			WHERE action = 'rejected' AND reason IS NOT NULL
+			WHERE member_id = ? AND action = 'rejected' AND reason IS NOT NULL
 			GROUP BY reason ORDER BY n DESC`,
+			memberId,
 		),
-		allPrices: priceAmounts(database),
-		offerCount: scalar(database, "SELECT COUNT(*) AS n FROM offers"),
+		allPrices: priceAmounts(database, memberId),
+		offerCount: scalar(
+			database,
+			"SELECT COUNT(*) AS n FROM decisions WHERE member_id = ?",
+			memberId,
+		),
 		viewedCount: scalar(
 			database,
-			"SELECT COUNT(*) AS n FROM interactions WHERE action = 'viewed'",
+			"SELECT COUNT(*) AS n FROM interactions WHERE member_id = ? AND action = 'viewed'",
+			memberId,
 		),
-		layouts: featureCounts(database, featureQuery("d.layout")),
+		layouts: featureCounts(database, featureQuery("d.layout"), memberId),
 		bedrooms: featureCounts(
 			database,
 			featureQuery("json_extract(d.rooms, '$.bedrooms')"),
+			memberId,
 		),
 		ber: featureCounts(
 			database,
 			featureQuery("json_extract(d.attributes, '$.ber')"),
+			memberId,
 		),
 	};
 }
 
-function favoritedSummaries(database: Database.Database): OfferSummary[] {
+function favoritedSummaries(
+	database: Database.Database,
+	memberId: string,
+): OfferSummary[] {
 	const records: unknown[] = database
 		.prepare(
-			`SELECT o.id AS id, o.provider AS provider, o.price AS price, o.status AS status,
-			o.user_status AS user_status, o.fetched_at AS fetched_at,
+			`SELECT o.id AS id, o.provider AS provider, o.price AS price, dec.market_status AS status,
+			dec.user_status AS user_status, o.fetched_at AS fetched_at,
 			d.address AS address, d.size AS size, d.rooms AS rooms, d.layout AS layout
-			FROM offers o JOIN dwellings d ON d.id = o.dwelling_id
-			WHERE o.id IN ${FAVORITED} ORDER BY o.fetched_at DESC`,
+			FROM decisions dec JOIN offers o ON o.id = dec.offer_id
+			JOIN dwellings d ON d.id = o.dwelling_id
+			WHERE dec.member_id = ? AND o.id IN ${FAVORITED}
+			ORDER BY o.fetched_at DESC`,
 		)
-		.all();
+		.all(memberId, memberId);
 	return records.map((record) => toSummary(record));
 }
 
@@ -64,8 +81,9 @@ function featureQuery(expression: string): string {
 function featureCounts(
 	database: Database.Database,
 	sql: string,
+	memberId: string,
 ): FeatureCount[] {
-	const records: unknown[] = database.prepare(sql).all();
+	const records: unknown[] = database.prepare(sql).all(memberId);
 	return records.flatMap((record) => {
 		if (
 			typeof record !== "object" ||
@@ -81,8 +99,12 @@ function featureCounts(
 	});
 }
 
-function scalar(database: Database.Database, sql: string): number {
-	const record: unknown = database.prepare(sql).get();
+function scalar(
+	database: Database.Database,
+	sql: string,
+	memberId: string,
+): number {
+	const record: unknown = database.prepare(sql).get(memberId);
 	if (
 		typeof record === "object" &&
 		record !== null &&
@@ -94,10 +116,12 @@ function scalar(database: Database.Database, sql: string): number {
 	return 0;
 }
 
-function priceAmounts(database: Database.Database): number[] {
+function priceAmounts(database: Database.Database, memberId: string): number[] {
 	const records: unknown[] = database
-		.prepare("SELECT price FROM offers")
-		.all();
+		.prepare(
+			"SELECT o.price AS price FROM offers o JOIN decisions d ON d.offer_id = o.id WHERE d.member_id = ?",
+		)
+		.all(memberId);
 	return records.flatMap((record) => {
 		const amount = amountFrom(record);
 		return amount === null ? [] : [amount];

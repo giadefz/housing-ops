@@ -1,12 +1,19 @@
 import type { Analysis, Interaction } from "../domain/analysis.js";
-import type { Dwelling } from "../domain/dwelling.js";
 import type {
+	Decision,
 	MarketOutcome,
 	MarketStatus,
-	Offer,
 	UserStatus,
-} from "../domain/offer.js";
+} from "../domain/decision.js";
+import type { Dwelling } from "../domain/dwelling.js";
+import type { Offer } from "../domain/offer.js";
 import type { Verdict } from "../domain/verdict.js";
+
+/** An offer together with one member's standing on it. */
+export interface MemberOffer {
+	offer: Offer;
+	decision: Decision;
+}
 
 /** One queue entry. Compact by design: full payloads come from findOffer. */
 export interface OfferSummary {
@@ -73,6 +80,19 @@ export interface MarketOutcomeEvent {
 	runId?: string;
 }
 
+/** A member's offers filtered to one market status, capped by a limit. */
+export interface OfferStatusQuery {
+	status: MarketStatus;
+	limit: number;
+}
+
+/** A market outcome to apply, with the offer and every decision it closes. */
+export interface MarketOutcomeCommand {
+	offer: Offer;
+	decisions: Decision[];
+	event: MarketOutcomeEvent;
+}
+
 /** Persists and queries offers. Implemented by storage adapters. */
 export interface OfferStorePort {
 	saveDwelling(dwelling: Dwelling): Promise<void>;
@@ -83,6 +103,13 @@ export interface OfferStorePort {
 		provider: string,
 		listingId: string,
 	): Promise<Offer | null>;
+	findDecision(memberId: string, offerId: string): Promise<Decision | null>;
+	listDecisionsForOffer(offerId: string): Promise<Decision[]>;
+	saveDecision(decision: Decision): Promise<void>;
+	listMemberOffers(
+		memberId: string,
+		query: OfferStatusQuery,
+	): Promise<MemberOffer[]>;
 	recordVerdict(
 		offerId: string,
 		runId: string,
@@ -90,16 +117,23 @@ export interface OfferStorePort {
 	): Promise<void>;
 	listVerdicts(offerId: string): Promise<Verdict[]>;
 	recordAnalysis(analysis: Analysis): Promise<void>;
+	listAnalyses(memberId: string, offerId: string): Promise<Analysis[]>;
 	recordInteraction(interaction: Interaction): Promise<void>;
-	listQueue(status: MarketStatus, limit: number): Promise<OfferSummary[]>;
-	listOffersByStatus(status: MarketStatus, limit: number): Promise<Offer[]>;
-	countOffersByStatus(status: MarketStatus): Promise<number>;
-	loadDigest(): Promise<DigestData>;
+	listInteractions(memberId: string, offerId: string): Promise<Interaction[]>;
+	listQueue(
+		memberId: string,
+		query: OfferStatusQuery,
+	): Promise<OfferSummary[]>;
+	countOffersByStatus(
+		memberId: string,
+		status: MarketStatus,
+	): Promise<number>;
+	loadDigest(memberId: string): Promise<DigestData>;
 	listStoredOffers(limit: number): Promise<StoredOfferDetail[]>;
 	startRun(provider: string): Promise<string>;
 	finishRun(runId: string, stats: RunStats): Promise<void>;
 	recordDeadLetter(entry: DeadLetterEntry): Promise<void>;
-	recordMarketOutcome(offer: Offer, event: MarketOutcomeEvent): Promise<void>;
+	recordMarketOutcome(command: MarketOutcomeCommand): Promise<void>;
 }
 
 /** An open store plus its lifecycle. What composition holds and closes. */

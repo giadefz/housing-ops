@@ -1,5 +1,7 @@
+import type { Analysis, Interaction } from "../domain/analysis.js";
+import type { Decision, UserStatus } from "../domain/decision.js";
 import type { Listing } from "../domain/listing.js";
-import type { Offer, UserStatus } from "../domain/offer.js";
+import type { Offer } from "../domain/offer.js";
 import type { PipelineEvent } from "../domain/events.js";
 import type { Verdict } from "../domain/verdict.js";
 import type { Profile } from "../schemas/profile.js";
@@ -32,10 +34,56 @@ export interface ValidationReport {
 	findings: Finding[];
 }
 
-/** One offer with everything recorded against it. Analyses and interactions ride on the offer. */
+/** One offer with one member's decision, analyses, interactions, and the world's verdicts. */
 export interface OfferDetail {
 	offer: Offer;
+	decision: Decision;
+	analyses: Analysis[];
+	interactions: Interaction[];
 	verdicts: Verdict[];
+}
+
+/** A request for one offer, as seen by a member. */
+export interface OfferQuery {
+	memberId: string;
+	offerId: string;
+}
+
+/** A request to record a judgment on a member's decision. */
+export interface VerdictCommand {
+	memberId: string;
+	offerId: string;
+	verdict: VerdictInput;
+}
+
+/** A request to record a member's reaction to an offer. */
+export interface InteractionCommand {
+	memberId: string;
+	offerId: string;
+	interaction: InteractionInput;
+}
+
+/** A request for a page of a member's queue. */
+export interface QueueQuery {
+	memberId: string;
+	queue: QueueInput;
+}
+
+/** A request for a member's profile digest. */
+export interface DigestQuery {
+	memberId: string;
+}
+
+/** A request to re-deliver an event to a member's offers. */
+export interface PublishQuery {
+	memberId: string;
+	publish: PublishInput;
+}
+
+/** A request to scan providers into the world's offers. */
+export interface ScanQuery {
+	memberId: string;
+	providerId?: string;
 }
 
 /** One configured provider, as listed from providers.yml. */
@@ -157,17 +205,17 @@ export interface ApplicationPort {
 	getVersion(): VersionInfo;
 	validateWorkspace(): ValidationReport;
 	setup(input: SetupInput, force: boolean): SetupResult;
-	getOffer(id: string): Promise<OfferDetail>;
+	getOffer(input: OfferQuery): Promise<OfferDetail>;
 	listProviders(): ProviderSummary[];
 	listFilters(): FilterSummary[];
 	checkFilter(id: string): Promise<FilterCheckResult>;
 	testProvider(id: string): Promise<ProviderTestResult>;
-	scan(providerId?: string): Promise<ScanResult>;
-	listQueue(input: QueueInput): Promise<QueueResult>;
-	setVerdict(id: string, input: VerdictInput): Promise<VerdictResult>;
-	interact(id: string, input: InteractionInput): Promise<InteractionResult>;
+	scan(input: ScanQuery): Promise<ScanResult>;
+	listQueue(input: QueueQuery): Promise<QueueResult>;
+	setVerdict(input: VerdictCommand): Promise<VerdictResult>;
+	interact(input: InteractionCommand): Promise<InteractionResult>;
 	getProfile(input: ProfileGetInput): ProfileValueResult;
 	setProfile(input: ProfileSetInput): ProfileSetResult;
-	getDigest(): Promise<DigestResult>;
-	publishNow(input: PublishInput): Promise<PublishResult>;
+	getDigest(input: DigestQuery): Promise<DigestResult>;
+	publishNow(input: PublishQuery): Promise<PublishResult>;
 }

@@ -1,6 +1,7 @@
 import { QueueInputSchema } from "../../../../core/schemas/requests.js";
 import type { Flags } from "../argv.js";
 import { fail, ok } from "../envelope.js";
+import { CLI_MEMBER_ID } from "../identity.js";
 import { readNumber, readString } from "./flags.js";
 import type { CommandHandler } from "./types.js";
 
@@ -10,7 +11,12 @@ export const queueCommands: Record<string, CommandHandler> = {
 		const parsed = QueueInputSchema.safeParse(queueRequest(args.flags));
 		if (!parsed.success)
 			return fail({ code: "VALIDATION", message: parsed.error.message });
-		return ok(await app.listQueue(parsed.data));
+		return ok(
+			await app.listQueue({
+				memberId: CLI_MEMBER_ID,
+				queue: parsed.data,
+			}),
+		);
 	},
 };
 

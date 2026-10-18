@@ -13,19 +13,20 @@ import type { Profile } from "../schemas/profile.js";
 
 const TOP_FEATURES = 5;
 
-/** One request to build the profile digest. */
+/** One request to build a member's profile digest. */
 export interface DigestRequest {
 	store: OfferStorePort;
 	clock: ClockPort;
 	profile: Profile;
+	memberId: string;
 }
 
-/** Builds the deterministic digest: explicit profile plus interaction stats. */
+/** Builds the deterministic digest: explicit profile plus the member's interaction stats. */
 export async function buildDigest(
 	request: DigestRequest,
 ): Promise<DigestResult> {
-	const { store, clock, profile } = request;
-	const data = await store.loadDigest();
+	const { store, clock, profile, memberId } = request;
+	const data = await store.loadDigest(memberId);
 	return { profile, stats: toStats(data), generatedAt: clock.now() };
 }
 

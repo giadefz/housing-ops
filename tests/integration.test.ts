@@ -3,11 +3,13 @@ import os from "node:os";
 import path from "node:path";
 import type Database from "better-sqlite3";
 import { afterEach, describe, expect, it } from "vitest";
+import { findDecision } from "../src/adapters/secondary/storage/sqlite/decision.js";
 import { findOfferByListing } from "../src/adapters/secondary/storage/sqlite/offer.js";
 import {
 	closeStore,
 	openStore,
 } from "../src/adapters/secondary/storage/sqlite/store.js";
+import { DEFAULT_MEMBER_ID } from "../src/core/domain/member.js";
 import { createDefaultApplication } from "../src/defaults.js";
 
 let roots: string[] = [];
@@ -15,6 +17,17 @@ afterEach(() => {
 	for (const root of roots) fs.rmSync(root, { recursive: true, force: true });
 	roots = [];
 });
+
+const MEMBER = DEFAULT_MEMBER_ID;
+
+async function marketStatus(
+	database: Database.Database,
+	listingId: string,
+): Promise<string | undefined> {
+	const offer = await findOfferByListing(database, "fake", listingId);
+	if (offer === null) return undefined;
+	return (await findDecision(database, MEMBER, offer.id))?.marketStatus;
+}
 
 const profileYaml = [
 	"version: 1",
@@ -117,17 +130,11 @@ describe("end to end", () => {
 				},
 			]);
 
-			const scan = await app.scan();
+			const scan = await app.scan({ memberId: MEMBER });
 			expect(scan).toEqual({ fetched: 3, stored: 2, deadLettered: 1 });
 
-			expect(
-				(await findOfferByListing(database, "fake", "cheap"))
-					?.marketStatus,
-			).toBe("passed");
-			expect(
-				(await findOfferByListing(database, "fake", "pricey"))
-					?.marketStatus,
-			).toBe("seen");
+			expect(await marketStatus(database, "cheap")).toBe("passed");
+			expect(await marketStatus(database, "pricey")).toBe("seen");
 
 			const dead: unknown[] = database
 				.prepare("SELECT * FROM dead_letter")

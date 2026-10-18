@@ -5,14 +5,14 @@ import {
 	type Dwelling,
 	type NewDwelling,
 } from "../domain/dwelling.js";
-import type { PipelineEvent } from "../domain/events.js";
-import { normalizeListing, type NewOffer } from "../domain/listing.js";
 import {
 	clearFilters,
 	parkForJudgment,
-	type Offer,
-	type OfferVersion,
-} from "../domain/offer.js";
+	type Decision,
+} from "../domain/decision.js";
+import type { PipelineEvent } from "../domain/events.js";
+import { normalizeListing, type NewOffer } from "../domain/listing.js";
+import type { Offer, OfferVersion } from "../domain/offer.js";
 import type { Verdict } from "../domain/verdict.js";
 import { errorMessage } from "../errors/message.js";
 import type { ScanResult } from "../ports/application.port.js";
@@ -25,6 +25,7 @@ import type {
 	RunStats,
 } from "../ports/store.port.js";
 import type { Profile } from "../schemas/profile.js";
+import { requireDecision } from "./offer.service.js";
 import { runFilters, type FilterStage } from "./pipeline.service.js";
 
 export interface ScanDependencies {
@@ -35,6 +36,7 @@ export interface ScanDependencies {
 	clock: ClockPort;
 	profile: Profile;
 	filters: FilterStage[];
+	memberId: string;
 	paceMs?: number;
 	log?: (message: string) => void;
 }
@@ -46,6 +48,7 @@ interface ScanWiring {
 	clock: ClockPort;
 	profile: Profile;
 	filters: FilterStage[];
+	memberId: string;
 	fetch: FetchContext;
 }
 
@@ -54,8 +57,16 @@ const FETCH_TIMEOUT_MS = 60_000;
 
 /** Fetches from each provider, normalizes, filters, stores, and emits milestones. */
 export function scan(dependencies: ScanDependencies): Promise<ScanResult> {
-	const { providers, events, store, pack, clock, profile, filters } =
-		dependencies;
+	const {
+		providers,
+		events,
+		store,
+		pack,
+		clock,
+		profile,
+		filters,
+		memberId,
+	} = dependencies;
 	const wiring: ScanWiring = {
 		store,
 		events,
@@ -63,6 +74,7 @@ export function scan(dependencies: ScanDependencies): Promise<ScanResult> {
 		clock,
 		profile,
 		filters,
+		memberId,
 		fetch: createFetchContext(dependencies),
 	};
 	return providers.reduce(
@@ -133,9 +145,15 @@ async function tryStore(job: RecordJob): Promise<StoreOutcome> {
 			payload: record,
 			wiring,
 		});
-		const judged = judge(resolved.offer, dwelling, wiring);
+		const decision = await requireDecision(
+			wiring.store,
+			wiring.memberId,
+			resolved.offer.id,
+		);
+		const judged = judge(resolved.offer, decision, dwelling, wiring);
 		await store.saveDwelling(dwelling);
 		await store.saveOffer(judged.offer);
+		await store.saveDecision(judged.decision);
 		await recordVerdicts(store, judged.offer.id, runId, judged.verdicts);
 		return { stored: true, judged, changed: resolved.changed };
 	} catch (error) {
@@ -154,7 +172,10 @@ async function emitEvent(
 ): Promise<void> {
 	const event = scanEvent(judged, changed);
 	if (event === null) return;
-	await events.emit(event, { offer: judged.offer });
+	await events.emit(event, {
+		offer: judged.offer,
+		decision: judged.decision,
+	});
 }
 
 /** The milestone a stored offer emits, if any. */
@@ -166,25 +187,33 @@ function scanEvent(judged: Judged, changed: boolean): PipelineEvent | null {
 
 interface Judged {
 	offer: Offer;
+	decision: Decision;
 	verdicts: Verdict[];
 	passed: boolean;
 }
 
-/** Runs the pipeline on a first sighting; a filtered-out offer stays "seen". */
-function judge(offer: Offer, dwelling: Dwelling, wiring: ScanWiring): Judged {
-	if (offer.marketStatus !== "seen")
-		return { offer, verdicts: [], passed: false };
+/** Runs the pipeline on a first sighting; a filtered-out decision stays "seen". */
+function judge(
+	offer: Offer,
+	decision: Decision,
+	dwelling: Dwelling,
+	wiring: ScanWiring,
+): Judged {
+	if (decision.marketStatus !== "seen")
+		return { offer, decision, verdicts: [], passed: false };
 	const run = runFilters(wiring.filters, {
 		offer,
 		dwelling,
 		profile: wiring.profile,
 		comparables: [],
 	});
-	if (!run.passed) return { offer, verdicts: run.verdicts, passed: false };
+	if (!run.passed)
+		return { offer, decision, verdicts: run.verdicts, passed: false };
 	return {
-		offer: wiring.profile.gate
-			? parkForJudgment(offer)
-			: clearFilters(offer),
+		offer,
+		decision: wiring.profile.gate
+			? parkForJudgment(decision)
+			: clearFilters(decision),
 		verdicts: run.verdicts,
 		passed: true,
 	};
@@ -246,10 +275,6 @@ async function resolveOffer(job: OfferJob): Promise<ResolvedOffer> {
 			postedAt: newOffer.postedAt,
 			fetchedAt: newOffer.fetchedAt,
 			versions: nextVersions({ existing, newOffer, payload }),
-			marketStatus: existing?.marketStatus ?? "seen",
-			userStatus: existing?.userStatus ?? "none",
-			analyses: existing?.analyses ?? [],
-			interactions: existing?.interactions ?? [],
 		},
 		changed: existing !== null && hasChanged(existing, newOffer),
 	};

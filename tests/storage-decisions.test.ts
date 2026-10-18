@@ -63,10 +63,6 @@ async function seedOffer(database: Database.Database): Promise<void> {
 		description: "Bright apartment",
 		fetchedAt: "2026-10-04T00:00:00.000Z",
 		versions: [],
-		marketStatus: "seen",
-		userStatus: "none",
-		analyses: [],
-		interactions: [],
 	};
 	await saveDwelling(database, dwelling);
 	await saveOffer(database, offer);

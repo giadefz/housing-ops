@@ -1,6 +1,7 @@
 import { InteractionInputSchema } from "../../../../core/schemas/requests.js";
 import type { Flags } from "../argv.js";
 import { fail, ok } from "../envelope.js";
+import { CLI_MEMBER_ID } from "../identity.js";
 import { readString } from "./flags.js";
 import type { CommandHandler } from "./types.js";
 
@@ -17,7 +18,13 @@ export const interactCommands: Record<string, CommandHandler> = {
 		);
 		if (!parsed.success)
 			return fail({ code: "VALIDATION", message: parsed.error.message });
-		return ok(await app.interact(id, parsed.data));
+		return ok(
+			await app.interact({
+				memberId: CLI_MEMBER_ID,
+				offerId: id,
+				interaction: parsed.data,
+			}),
+		);
 	},
 };
 

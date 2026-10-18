@@ -1,16 +1,21 @@
+import { freshDecision, type Decision } from "../domain/decision.js";
 import { OfferNotFoundError } from "../errors/offer.js";
 import type { Offer } from "../domain/offer.js";
 import type { OfferDetail } from "../ports/application.port.js";
 import type { OfferStorePort } from "../ports/store.port.js";
 
-/** Loads one offer with its versions, analyses, interactions, and verdicts. */
+/** Loads one offer with a member's decision, analyses, interactions, and the world's verdicts. */
 export async function getOffer(
 	store: OfferStorePort,
-	id: string,
+	memberId: string,
+	offerId: string,
 ): Promise<OfferDetail> {
-	const offer = await requireOffer(store, id);
-	const verdicts = await store.listVerdicts(id);
-	return { offer, verdicts };
+	const offer = await requireOffer(store, offerId);
+	const decision = await requireDecision(store, memberId, offerId);
+	const analyses = await store.listAnalyses(memberId, offerId);
+	const interactions = await store.listInteractions(memberId, offerId);
+	const verdicts = await store.listVerdicts(offerId);
+	return { offer, decision, analyses, interactions, verdicts };
 }
 
 /** Loads one offer, or throws when it is not stored. */
@@ -21,4 +26,14 @@ export async function requireOffer(
 	const offer = await store.findOffer(id);
 	if (offer === null) throw new OfferNotFoundError(id);
 	return offer;
+}
+
+/** Loads a member's decision on an offer, or a fresh one when the member has not acted. */
+export async function requireDecision(
+	store: OfferStorePort,
+	memberId: string,
+	offerId: string,
+): Promise<Decision> {
+	const decision = await store.findDecision(memberId, offerId);
+	return decision ?? freshDecision(memberId, offerId);
 }

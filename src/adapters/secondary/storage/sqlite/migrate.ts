@@ -21,7 +21,7 @@ export interface TableDefinition {
 	createTable: string;
 }
 
-/** Ordered schema migrations. Additive only: history is never rewritten. */
+/** Ordered schema migrations. Applied once, in order, atomically. */
 interface Migration {
 	version: number;
 	statements: string[];
@@ -50,6 +50,25 @@ const BACKFILL_DECISIONS = `
 INSERT OR IGNORE INTO decisions (member_id, offer_id, market_status, user_status)
 SELECT '${DEFAULT_MEMBER_ID}', id, status, user_status FROM offers;`;
 
+/** Re-projects every offer's status into its decision, so statuses written after v2 survive the drop. */
+const RESYNC_DECISIONS = `
+INSERT INTO decisions (member_id, offer_id, market_status, user_status)
+SELECT '${DEFAULT_MEMBER_ID}', id, status, user_status FROM offers WHERE true
+ON CONFLICT(member_id, offer_id) DO UPDATE SET
+market_status = excluded.market_status, user_status = excluded.user_status;`;
+
+/** Scopes recorded judgments and reactions to a member. Existing rows belong to the built-in member. */
+const ADD_MEMBER_SCOPE = [
+	`ALTER TABLE analyses ADD COLUMN member_id TEXT NOT NULL DEFAULT '${DEFAULT_MEMBER_ID}';`,
+	`ALTER TABLE interactions ADD COLUMN member_id TEXT NOT NULL DEFAULT '${DEFAULT_MEMBER_ID}';`,
+];
+
+/** Drops the per-offer status columns now that decisions hold them. */
+const DROP_OFFER_STATUS = [
+	"ALTER TABLE offers DROP COLUMN status;",
+	"ALTER TABLE offers DROP COLUMN user_status;",
+];
+
 const MIGRATIONS: Migration[] = [
 	{
 		version: 1,
@@ -64,6 +83,14 @@ const MIGRATIONS: Migration[] = [
 			SEED_DEFAULT_MEMBER,
 			decisionTable.createTable,
 			BACKFILL_DECISIONS,
+		],
+	},
+	{
+		version: 3,
+		statements: [
+			RESYNC_DECISIONS,
+			...ADD_MEMBER_SCOPE,
+			...DROP_OFFER_STATUS,
 		],
 	},
 ];

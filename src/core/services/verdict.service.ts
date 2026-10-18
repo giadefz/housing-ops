@@ -4,40 +4,43 @@ import type {
 	AnalysisTier,
 	AnalysisVerdict,
 } from "../domain/analysis.js";
+import { recordJudgment, type Decision } from "../domain/decision.js";
 import type { PipelineEvent } from "../domain/events.js";
-import { recordJudgment, type Offer } from "../domain/offer.js";
+import type { Offer } from "../domain/offer.js";
 import type { VerdictResult } from "../ports/application.port.js";
 import type { ClockPort } from "../ports/clock.port.js";
 import type { EventBus } from "../ports/event-bus.port.js";
 import type { OfferStorePort } from "../ports/store.port.js";
 import type { VerdictInput } from "../schemas/requests.js";
-import { requireOffer } from "./offer.service.js";
+import { requireDecision, requireOffer } from "./offer.service.js";
 
 /** One request to record a judgment on an offer. */
 export interface VerdictRequest {
 	store: OfferStorePort;
 	clock: ClockPort;
 	events: EventBus;
-	id: string;
+	memberId: string;
+	offerId: string;
 	input: VerdictInput;
 }
 
-/** Records a judgment, moves the status, appends the analysis, and emits the milestone. */
+/** Records a judgment, moves the decision, appends the analysis, and emits the milestone. */
 export async function setVerdict(
 	request: VerdictRequest,
 ): Promise<VerdictResult> {
-	const { store, clock, events, id, input } = request;
-	const offer = await requireOffer(store, id);
-	const judged = recordJudgment(offer, input.tier, input.verdict);
-	const analysis = toAnalysis(id, input, clock.now());
-	await store.saveOffer(judged);
+	const { store, clock, events, memberId, offerId, input } = request;
+	const offer = await requireOffer(store, offerId);
+	const decision = await requireDecision(store, memberId, offerId);
+	const judged = recordJudgment(decision, input.tier, input.verdict);
+	const analysis = toAnalysis(memberId, offerId, input, clock.now());
+	await store.saveDecision(judged);
 	await store.recordAnalysis(analysis);
 	await emitJudgment({
 		events,
 		tier: input.tier,
 		verdict: input.verdict,
-		judged,
-		analysis,
+		offer,
+		decision: judged,
 	});
 	return { analysisId: analysis.id };
 }
@@ -46,18 +49,16 @@ interface JudgmentEvent {
 	events: EventBus;
 	tier: AnalysisTier;
 	verdict: AnalysisVerdict;
-	judged: Offer;
-	analysis: Analysis;
+	offer: Offer;
+	decision: Decision;
 }
 
 async function emitJudgment(source: JudgmentEvent): Promise<void> {
 	const event = judgmentEvent(source.tier, source.verdict);
 	if (event === null) return;
 	await source.events.emit(event, {
-		offer: {
-			...source.judged,
-			analyses: [...source.judged.analyses, source.analysis],
-		},
+		offer: source.offer,
+		decision: source.decision,
 	});
 }
 
@@ -72,10 +73,16 @@ function judgmentEvent(
 	return null;
 }
 
-function toAnalysis(id: string, input: VerdictInput, at: string): Analysis {
+function toAnalysis(
+	memberId: string,
+	offerId: string,
+	input: VerdictInput,
+	at: string,
+): Analysis {
 	return {
 		id: crypto.randomUUID(),
-		offerId: id,
+		memberId,
+		offerId,
 		tier: input.tier,
 		verdict: input.verdict,
 		reason: input.reason,

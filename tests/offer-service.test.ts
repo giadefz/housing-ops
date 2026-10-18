@@ -3,7 +3,9 @@ import os from "node:os";
 import path from "node:path";
 import type Database from "better-sqlite3";
 import { afterEach, describe, expect, it } from "vitest";
+import type { Decision } from "../src/core/domain/decision.js";
 import type { Dwelling } from "../src/core/domain/dwelling.js";
+import { DEFAULT_MEMBER_ID } from "../src/core/domain/member.js";
 import type { Offer } from "../src/core/domain/offer.js";
 import { OfferNotFoundError } from "../src/core/errors/offer.js";
 import { getOffer } from "../src/core/services/offer.service.js";
@@ -18,6 +20,8 @@ afterEach(() => {
 	for (const cleanup of cleanups) cleanup();
 	cleanups = [];
 });
+
+const MEMBER = DEFAULT_MEMBER_ID;
 
 function testStore(): ReturnType<typeof createSqliteStore> {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), "housing-ops-"));
@@ -54,10 +58,6 @@ function offerFixture(): Offer {
 		description: "Bright apartment",
 		fetchedAt: "2026-10-04T00:00:00.000Z",
 		versions: [],
-		marketStatus: "seen",
-		userStatus: "none",
-		analyses: [],
-		interactions: [],
 	};
 }
 
@@ -66,6 +66,13 @@ async function seed(
 ): Promise<void> {
 	await store.saveDwelling(dwellingFixture());
 	await store.saveOffer(offerFixture());
+	const decision: Decision = {
+		memberId: MEMBER,
+		offerId: "offer-1",
+		marketStatus: "seen",
+		userStatus: "none",
+	};
+	await store.saveDecision(decision);
 	await store.recordVerdict("offer-1", "run-1", {
 		filterId: "budget",
 		outcome: "pass",
@@ -74,19 +81,21 @@ async function seed(
 }
 
 describe("getOffer", () => {
-	it("returns the offer with its recorded verdicts", async () => {
+	it("returns the offer with the member's decision and the recorded verdicts", async () => {
 		const store = testStore();
 		await seed(store);
-		const detail = await getOffer(store, "offer-1");
+		const detail = await getOffer(store, MEMBER, "offer-1");
 		expect(detail.offer.id).toBe("offer-1");
-		expect(detail.offer.marketStatus).toBe("seen");
+		expect(detail.decision.marketStatus).toBe("seen");
+		expect(detail.analyses).toEqual([]);
+		expect(detail.interactions).toEqual([]);
 		expect(detail.verdicts).toEqual([
 			{ filterId: "budget", outcome: "pass", reason: "" },
 		]);
 	});
 	it("throws OfferNotFoundError for an unknown id", async () => {
 		const store = testStore();
-		await expect(getOffer(store, "missing")).rejects.toBeInstanceOf(
+		await expect(getOffer(store, MEMBER, "missing")).rejects.toBeInstanceOf(
 			OfferNotFoundError,
 		);
 	});
