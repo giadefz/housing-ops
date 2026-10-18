@@ -1,10 +1,13 @@
 import fs from "node:fs";
 import Database from "better-sqlite3";
+import { DEFAULT_MEMBER_ID } from "../../../../core/domain/member.js";
 import { analysisTable } from "./analysis.js";
 import { deadLetterTable } from "./dead-letter.js";
+import { decisionTable } from "./decision.js";
 import { dwellingTable } from "./dwelling.js";
 import { interactionTable } from "./interaction.js";
 import { marketEventTable } from "./market-event.js";
+import { memberTable } from "./member.js";
 import { offerTable } from "./offer.js";
 import { offerVersionTable } from "./offer-version.js";
 import { providersStateTable } from "./providers-state.js";
@@ -37,12 +40,31 @@ const ENTITY_TABLES: TableDefinition[] = [
 	providersStateTable,
 ];
 
+/** Seeds the built-in member the local CLI acts as. */
+const SEED_DEFAULT_MEMBER = `
+INSERT INTO members (id, name, role, created_at)
+SELECT '${DEFAULT_MEMBER_ID}', 'Local', 'admin', strftime('%Y-%m-%dT%H:%M:%fZ', 'now');`;
+
+/** Gives every existing offer a decision for the built-in member. */
+const BACKFILL_DECISIONS = `
+INSERT OR IGNORE INTO decisions (member_id, offer_id, market_status, user_status)
+SELECT '${DEFAULT_MEMBER_ID}', id, status, user_status FROM offers;`;
+
 const MIGRATIONS: Migration[] = [
 	{
 		version: 1,
 		statements: orderTables(ENTITY_TABLES).map(
 			(table) => table.createTable,
 		),
+	},
+	{
+		version: 2,
+		statements: [
+			memberTable.createTable,
+			SEED_DEFAULT_MEMBER,
+			decisionTable.createTable,
+			BACKFILL_DECISIONS,
+		],
 	},
 ];
 

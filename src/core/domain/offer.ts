@@ -4,13 +4,28 @@ import {
 } from "../errors/offer.js";
 import {
 	ANALYSE_VERDICTS,
-	INTERACTION_ACTIONS,
 	TRIAGE_VERDICTS,
 	type Analysis,
 	type AnalysisTier,
 	type AnalysisVerdict,
 	type Interaction,
 } from "./analysis.js";
+import type {
+	MarketEvent,
+	MarketOutcome,
+	MarketStatus,
+	UserAction,
+	UserStatus,
+} from "./decision.js";
+
+export { MARKET_STATUSES, USER_STATUSES } from "./decision.js";
+export type {
+	MarketEvent,
+	MarketOutcome,
+	MarketStatus,
+	UserAction,
+	UserStatus,
+} from "./decision.js";
 
 /** All markets. Single source for the Market union. */
 export const MARKETS = ["rent", "buy"] as const;
@@ -55,45 +70,6 @@ export interface Price {
 	currency: string;
 	period: (typeof PRICE_PERIODS)[number];
 }
-
-/** Every market status an offer can hold. Single source for the MarketStatus union. */
-export const MARKET_STATUSES = [
-	"seen",
-	"passed",
-	"pending",
-	"screened",
-	"shortlisted",
-	"rejected",
-	"held",
-	"let",
-	"sold",
-	"gone",
-] as const;
-
-/** Where the listing is in its market life. */
-export type MarketStatus = (typeof MARKET_STATUSES)[number];
-
-/** Every user status an offer can hold. Single source for the UserStatus union. */
-export const USER_STATUSES = [
-	"none",
-	"viewed",
-	"favorited",
-	"viewing_requested",
-	"visited",
-	"rejected_by_user",
-] as const;
-
-/** How the user relates to the offer. Layers on top of the market status. */
-export type UserStatus = (typeof USER_STATUSES)[number];
-
-/** A user reaction. Sharing leaves the user status untouched. */
-export type UserAction = (typeof INTERACTION_ACTIONS)[number];
-
-/** A market outcome that closes the listing. */
-export type MarketOutcome = "let" | "sold" | "gone";
-
-/** Everything that can move an offer's market status. */
-export type MarketEvent = "clear" | "park" | AnalysisVerdict | MarketOutcome;
 
 type MarketTransitions = Partial<Record<MarketEvent, MarketStatus>>;
 
