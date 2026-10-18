@@ -5,6 +5,7 @@ import {
 } from "./adapters/secondary/filters/registry.js";
 import { profileCoverageWarnings } from "./adapters/secondary/filters/coverage.js";
 import { parseProfile, tryParseProfile } from "./adapters/secondary/profile.js";
+import type { WorkspaceReadRequest } from "./adapters/secondary/workspace.js";
 import {
 	buildProviders,
 	listProviderSummaries,
@@ -57,10 +58,9 @@ const CHECK_EXAMPLE_LIMIT = 5;
 /** The concrete adapters the application is wired with. */
 export interface ApplicationDependencies {
 	storeFactory: StoreFactory;
-	readWorkspace: (root: string) => WorkspaceInput;
+	readWorkspace: (request: WorkspaceReadRequest) => WorkspaceInput;
 	writeProfile: (root: string, profile: Profile) => void;
 	writeWorkspace: (root: string, plan: WorkspacePlan, force: boolean) => void;
-	initDatabase: (root: string) => string;
 	clock: ClockPort;
 	pack: CountryPack;
 	warn: (message: string) => void;
@@ -76,12 +76,15 @@ export async function createApplication(
 		readWorkspace,
 		writeProfile,
 		writeWorkspace,
-		initDatabase,
 		clock,
 		pack,
 		warn,
 	} = dependencies;
-	const workspace = readWorkspace(root);
+	const workspace = readWorkspace({
+		root,
+		store: storeFactory.describe(root),
+		expectedSchemaVersion: storeFactory.targetSchemaVersion,
+	});
 	const providersText = workspace.configTexts["providers.yml"];
 	const pipelineText = workspace.configTexts["pipeline.yml"];
 	const profileText = workspace.configTexts["profile.yml"];
@@ -96,7 +99,7 @@ export async function createApplication(
 	const setupInputs = {
 		write: (plan: WorkspacePlan, force: boolean) =>
 			writeWorkspace(root, plan, force),
-		initDatabase: () => initDatabase(root),
+		initStore: () => storeFactory.init(root),
 	};
 	warnOnProfileGaps({
 		profileText,

@@ -1,11 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import Database from "better-sqlite3";
-import { databasePath, DATABASE_FILE } from "../../workspace.js";
-import { migrate } from "./migrate.js";
+import type { StoreDescription } from "../../../../core/ports/store.port.js";
+import { DATABASE_FILE, databasePath } from "./location.js";
+import { migrate, SCHEMA_VERSION } from "./migrate.js";
 
-/** Creates the workspace database and applies migrations. Idempotent. Returns the relative path. */
-export function initDatabase(root: string): string {
+/** Creates the workspace database, applies migrations, and describes it. Idempotent. */
+export function initDatabase(root: string): StoreDescription {
 	const file = databasePath(root);
 	fs.mkdirSync(path.dirname(file), { recursive: true });
 	const database = new Database(file);
@@ -14,5 +15,5 @@ export function initDatabase(root: string): string {
 	} finally {
 		database.close();
 	}
-	return DATABASE_FILE;
+	return { location: DATABASE_FILE, schemaVersion: SCHEMA_VERSION };
 }

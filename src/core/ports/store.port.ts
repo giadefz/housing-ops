@@ -108,7 +108,19 @@ export interface StoreHandle {
 	close(): void;
 }
 
-/** Opens a workspace's store. Implemented by each datastore adapter. */
+/** What a store reports about itself: where it lives and which schema version is applied. */
+export interface StoreDescription {
+	/** Location relative to the workspace root, e.g. a file path or a connection name. */
+	location: string;
+	/** Applied schema version; null when the store does not exist yet. */
+	schemaVersion: number | null;
+}
+
+/** Opens, creates, and describes a workspace's store. Implemented by each datastore adapter. */
 export interface StoreFactory {
+	/** The schema version this factory migrates to. */
+	targetSchemaVersion: number;
 	open(workspaceRoot: string): StoreHandle;
+	describe(workspaceRoot: string): StoreDescription;
+	init(workspaceRoot: string): StoreDescription;
 }

@@ -10,25 +10,31 @@ import {
 import type { ConfigFile } from "../../core/schemas/index.js";
 import type { Profile } from "../../core/schemas/profile.js";
 import { WorkspaceExistsError } from "../../core/errors/setup.js";
+import type { StoreDescription } from "../../core/ports/store.port.js";
 import type { WorkspacePlan } from "../../core/services/setup.service.js";
 import type { WorkspaceInput } from "../../core/services/validate.service.js";
-import { readSchemaVersion, SCHEMA_VERSION } from "./storage/sqlite/migrate.js";
 
 /** Workspace locations. The root is the repo checkout or HOUSING_OPS_ROOT. */
 export function resolveRoot(): string {
 	return process.env.HOUSING_OPS_ROOT ?? process.cwd();
 }
 
-/** Reads every file validation needs: raw config texts, current file hashes, database presence and schema version. */
-export function readWorkspace(root: string): WorkspaceInput {
+/** What validation reading needs: the root, the store's self-description, and the schema version core expects. */
+export interface WorkspaceReadRequest {
+	root: string;
+	store: StoreDescription;
+	expectedSchemaVersion: number;
+}
+
+/** Reads every file validation needs and pairs it with the store's self-description. */
+export function readWorkspace(request: WorkspaceReadRequest): WorkspaceInput {
+	const { root, store, expectedSchemaVersion } = request;
 	const extensionsText = readText(configPath(root, "extensions.yml"));
-	const file = databasePath(root);
 	return {
 		configTexts: readConfigs(root),
 		currentHashes: readCurrentHashes(root, extensionsText),
-		databaseExists: fs.existsSync(file),
-		schemaVersion: readSchemaVersion(file),
-		expectedSchemaVersion: SCHEMA_VERSION,
+		store,
+		expectedSchemaVersion,
 	};
 }
 
@@ -59,13 +65,6 @@ export function writeWorkspace(
 		fs.writeFileSync(configPath(root, file), yaml.dump(plan[file]), "utf8");
 	}
 }
-
-export function databasePath(root: string): string {
-	return path.join(root, DATABASE_FILE);
-}
-
-/** The workspace database, relative to the root. */
-export const DATABASE_FILE = "data/housing.db";
 
 function readConfigs(root: string): Record<ConfigFile, string | null> {
 	return {

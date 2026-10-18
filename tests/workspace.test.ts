@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { storeFactory } from "../src/adapters/secondary/store-factory.js";
 import { initDatabase } from "../src/adapters/secondary/storage/sqlite/init.js";
 import { SCHEMA_VERSION } from "../src/adapters/secondary/storage/sqlite/migrate.js";
 import {
@@ -42,6 +43,14 @@ function emptyRoot(): string {
 	return root;
 }
 
+function read(root: string) {
+	return readWorkspace({
+		root,
+		store: storeFactory.describe(root),
+		expectedSchemaVersion: storeFactory.targetSchemaVersion,
+	});
+}
+
 describe("writeWorkspace", () => {
 	it("writes all five config documents under config/", () => {
 		const root = emptyRoot();
@@ -49,7 +58,7 @@ describe("writeWorkspace", () => {
 		for (const file of CONFIG_FILES) {
 			expect(fs.existsSync(path.join(root, "config", file))).toBe(true);
 		}
-		const workspace = readWorkspace(root);
+		const workspace = read(root);
 		for (const file of CONFIG_FILES) {
 			expect(workspace.configTexts[file]).not.toBeNull();
 		}
@@ -60,9 +69,8 @@ describe("initDatabase", () => {
 	it("creates the database at the workspace schema version", () => {
 		const root = emptyRoot();
 		initDatabase(root);
-		const workspace = readWorkspace(root);
-		expect(workspace.databaseExists).toBe(true);
-		expect(workspace.schemaVersion).toBe(SCHEMA_VERSION);
+		const workspace = read(root);
+		expect(workspace.store.schemaVersion).toBe(SCHEMA_VERSION);
 	});
 
 	it("is idempotent", () => {
@@ -77,7 +85,7 @@ describe("setup end state", () => {
 		const root = emptyRoot();
 		writeWorkspace(root, plan);
 		initDatabase(root);
-		const findings = validateWorkspace(readWorkspace(root)).findings;
+		const findings = validateWorkspace(read(root)).findings;
 		expect(findings.filter((finding) => !finding.ok)).toEqual([]);
 	});
 });

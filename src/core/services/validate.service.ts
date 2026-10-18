@@ -10,13 +10,13 @@ import {
 import { errorMessage } from "../errors/message.js";
 import { API_VERSION } from "../version.js";
 import type { Finding, ValidationReport } from "../ports/application.port.js";
+import type { StoreDescription } from "../ports/store.port.js";
 
-/** Everything validation reads: raw config texts, current file hashes, database presence and schema version. */
+/** Everything validation reads: raw config texts, current file hashes, the store's self-description, and the schema core expects. */
 export interface WorkspaceInput {
 	configTexts: Record<ConfigFile, string | null>;
 	currentHashes: Record<string, string | null>;
-	databaseExists: boolean;
-	schemaVersion: number | null;
+	store: StoreDescription;
 	expectedSchemaVersion: number;
 }
 
@@ -31,7 +31,7 @@ export function validateWorkspace(input: WorkspaceInput): ValidationReport {
 				input.configTexts["extensions.yml"],
 				input.currentHashes,
 			),
-			checkDatabase(input.databaseExists),
+			checkDatabase(input.store),
 			checkSchemaVersion(input),
 			checkApiVersion(),
 		],
@@ -146,9 +146,9 @@ function verifyApprovalFile(
 	return { name: `extension.${approval.id}`, ok: true };
 }
 
-function checkDatabase(databaseExists: boolean): Finding {
-	if (databaseExists)
-		return { name: "db", ok: true, detail: "data/housing.db present" };
+function checkDatabase(store: StoreDescription): Finding {
+	if (store.schemaVersion !== null)
+		return { name: "db", ok: true, detail: `${store.location} present` };
 	return { name: "db", ok: false, detail: `not initialized — ${SETUP_HINT}` };
 }
 
@@ -157,22 +157,22 @@ function checkApiVersion(): Finding {
 }
 
 function checkSchemaVersion(input: WorkspaceInput): Finding {
-	if (input.schemaVersion === null) {
+	const applied = input.store.schemaVersion;
+	if (applied === null) {
 		return { name: "schema", ok: true, detail: "no database yet" };
 	}
-	if (input.schemaVersion === input.expectedSchemaVersion) {
-		return { name: "schema", ok: true, detail: `v${input.schemaVersion}` };
+	if (applied === input.expectedSchemaVersion) {
+		return { name: "schema", ok: true, detail: `v${applied}` };
 	}
 	return {
 		name: "schema",
 		ok: false,
-		detail: `database schema v${input.schemaVersion} vs core v${input.expectedSchemaVersion} — ${schemaFixHint(input)}`,
+		detail: `database schema v${applied} vs core v${input.expectedSchemaVersion} — ${schemaFixHint(input)}`,
 	};
 }
 
 function schemaFixHint(input: WorkspaceInput): string {
-	const behind =
-		input.schemaVersion !== null &&
-		input.schemaVersion < input.expectedSchemaVersion;
+	const applied = input.store.schemaVersion;
+	const behind = applied !== null && applied < input.expectedSchemaVersion;
 	return behind ? "open the workspace to migrate" : "update housing-ops";
 }

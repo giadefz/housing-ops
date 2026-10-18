@@ -14,8 +14,7 @@ function emptyInput(): WorkspaceInput {
 			"extensions.yml": null,
 		},
 		currentHashes: {},
-		databaseExists: false,
-		schemaVersion: null,
+		store: { location: "data/housing.db", schemaVersion: null },
 		expectedSchemaVersion: 1,
 	};
 }
@@ -171,22 +170,19 @@ describe("schema version", () => {
 	});
 	it("passes when the database schema matches the core", () => {
 		const input = emptyInput();
-		input.databaseExists = true;
-		input.schemaVersion = 1;
+		input.store.schemaVersion = 1;
 		expect(schemaFinding(input).ok).toBe(true);
 	});
 	it("fails when the database schema is behind", () => {
 		const input = emptyInput();
-		input.databaseExists = true;
-		input.schemaVersion = 0;
+		input.store.schemaVersion = 0;
 		const finding = schemaFinding(input);
 		expect(finding.ok).toBe(false);
 		expect(finding.detail).toMatch(/migrate/);
 	});
 	it("fails when the database schema is ahead", () => {
 		const input = emptyInput();
-		input.databaseExists = true;
-		input.schemaVersion = 2;
+		input.store.schemaVersion = 2;
 		const finding = schemaFinding(input);
 		expect(finding.ok).toBe(false);
 		expect(finding.detail).toMatch(/update housing-ops/);
