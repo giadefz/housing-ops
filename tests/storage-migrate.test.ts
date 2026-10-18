@@ -66,6 +66,7 @@ describe("migrate", () => {
 			"decisions",
 			"dwellings",
 			"feed",
+			"feed_cursor",
 			"interactions",
 			"market_events",
 			"members",

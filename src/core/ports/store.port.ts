@@ -6,7 +6,7 @@ import type {
 	UserStatus,
 } from "../domain/decision.js";
 import type { Dwelling } from "../domain/dwelling.js";
-import type { FeedEntry } from "../domain/feed.js";
+import type { FeedCursor, FeedEntry } from "../domain/feed.js";
 import type { Offer } from "../domain/offer.js";
 import type { QueueView } from "../domain/queue.js";
 import type { Verdict } from "../domain/verdict.js";
@@ -21,6 +21,22 @@ export interface MemberOffer {
 export interface FeedOffer {
 	offer: Offer;
 	feed: FeedEntry;
+}
+
+/** One pool row offered to a feed fill, with the member's judgment and feed membership. */
+export interface PoolCandidate {
+	offer: Offer;
+	dwelling: Dwelling;
+	enteredAt: string;
+	marketStatus?: MarketStatus;
+	inFeed: boolean;
+}
+
+/** A bounded page below a member's feed cursor. */
+export interface PoolBatchQuery {
+	memberId: string;
+	cursor: FeedCursor | null;
+	limit: number;
 }
 
 /** One queue entry. Compact by design: full payloads come from findOffer. */
@@ -112,10 +128,18 @@ export interface OfferStorePort {
 	saveDwelling(dwelling: Dwelling): Promise<void>;
 	findDwellingByAddressKey(addressKey: string): Promise<Dwelling | null>;
 	saveOffer(offer: Offer): Promise<void>;
-	addToPool(offerId: string, enteredAt: string): Promise<void>;
+	addToPool(offerId: string, enteredAt: string): Promise<string>;
 	addToFeed(entry: FeedEntry): Promise<void>;
 	findFeedEntry(memberId: string, offerId: string): Promise<FeedEntry | null>;
 	listFeedOffers(memberId: string, limit: number): Promise<FeedOffer[]>;
+	findFeedCursor(memberId: string): Promise<FeedCursor | null>;
+	saveFeedCursor(cursor: FeedCursor): Promise<void>;
+	deleteFeedCursor(memberId: string): Promise<void>;
+	resetFeed(memberId: string): Promise<void>;
+	listPoolBatch(query: PoolBatchQuery): Promise<PoolCandidate[]>;
+	countFeed(memberId: string): Promise<number>;
+	countUnjudged(memberId: string): Promise<number>;
+	clearFeed(memberId: string): Promise<void>;
 	findOffer(id: string): Promise<Offer | null>;
 	findOfferByListing(
 		provider: string,

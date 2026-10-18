@@ -18,7 +18,21 @@ import {
 	saveDwelling,
 } from "./dwelling.js";
 import { loadDigest } from "./digest.js";
-import { addToFeed, findFeedEntry, listFeedEntries } from "./feed.js";
+import {
+	addToFeed,
+	clearFeed,
+	clearFeedSync,
+	countFeed,
+	countUnjudged,
+	findFeedEntry,
+	listFeedEntries,
+} from "./feed.js";
+import {
+	deleteFeedCursor,
+	deleteFeedCursorSync,
+	findFeedCursor,
+	saveFeedCursor,
+} from "./feed-cursor.js";
 import { listInteractions, recordInteraction } from "./interaction.js";
 import { recordMarketOutcome } from "./market-event.js";
 import { migrate } from "./migrate.js";
@@ -28,7 +42,7 @@ import {
 	listOfferIds,
 	saveOffer,
 } from "./offer.js";
-import { addToPool } from "./pool.js";
+import { addToPool, listPoolBatch } from "./pool.js";
 import { countQueue, listQueue } from "./queue.js";
 import { finishRun, startRun } from "./run.js";
 import { listVerdicts, recordVerdict } from "./verdict.js";
@@ -59,6 +73,15 @@ export function createSqliteStore(database: Database.Database): OfferStorePort {
 			findFeedEntry(database, memberId, offerId),
 		listFeedOffers: async (memberId, limit) =>
 			listFeedOffers(database, memberId, limit),
+		findFeedCursor: async (memberId) => findFeedCursor(database, memberId),
+		saveFeedCursor: (cursor) => saveFeedCursor(database, cursor),
+		deleteFeedCursor: async (memberId) =>
+			deleteFeedCursor(database, memberId),
+		listPoolBatch: (query) => listPoolBatch(database, query),
+		countFeed: async (memberId) => countFeed(database, memberId),
+		countUnjudged: async (memberId) => countUnjudged(database, memberId),
+		clearFeed: async (memberId) => clearFeed(database, memberId),
+		resetFeed: async (memberId) => resetFeed(database, memberId),
 		findOffer: (id) => findOffer(database, id),
 		findOfferByListing: (provider, listingId) =>
 			findOfferByListing(database, provider, listingId),
@@ -123,4 +146,15 @@ async function listFeedOffers(
 		if (offer !== null) offers.push({ offer, feed });
 	}
 	return offers;
+}
+
+async function resetFeed(
+	database: Database.Database,
+	memberId: string,
+): Promise<void> {
+	const reset = database.transaction(() => {
+		clearFeedSync(database, memberId);
+		deleteFeedCursorSync(database, memberId);
+	});
+	reset();
 }

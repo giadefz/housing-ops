@@ -26,6 +26,11 @@ import type { ProviderPort } from "./core/ports/provider.port.js";
 import type { OfferStorePort, StoreFactory } from "./core/ports/store.port.js";
 import type { Profile } from "./core/schemas/profile.js";
 import { buildDigest } from "./core/services/digest.service.js";
+import {
+	emptyFeed,
+	fillFeed,
+	getFeedStatus,
+} from "./core/services/feed.service.js";
 import { checkFilter } from "./core/services/filter.service.js";
 import { interact } from "./core/services/interaction.service.js";
 import { getOffer } from "./core/services/offer.service.js";
@@ -124,6 +129,28 @@ export async function createApplication(
 					memberId: input.memberId,
 					input: input.queue,
 				}),
+			),
+		getFeedStatus: (input) =>
+			withStore(storeFactory, root, (store) =>
+				getFeedStatus({ store, memberId: input.memberId }),
+			),
+		fillFeed: (input) =>
+			withStore(storeFactory, root, (store) =>
+				fillFeed({
+					store,
+					events,
+					profile: parseProfile(profileText),
+					filters: buildFilterStages(
+						pipelineText,
+						pack.code,
+						filters,
+					),
+					memberId: input.memberId,
+				}),
+			),
+		emptyFeed: (input) =>
+			withStore(storeFactory, root, (store) =>
+				emptyFeed({ store, memberId: input.memberId }),
 			),
 		setVerdict: (input) =>
 			withStore(storeFactory, root, (store) =>

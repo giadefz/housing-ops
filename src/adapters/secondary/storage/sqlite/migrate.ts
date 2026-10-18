@@ -6,6 +6,7 @@ import { deadLetterTable } from "./dead-letter.js";
 import { decisionTable } from "./decision.js";
 import { dwellingTable } from "./dwelling.js";
 import { feedTable } from "./feed.js";
+import { feedCursorTable } from "./feed-cursor.js";
 import { interactionTable } from "./interaction.js";
 import { marketEventTable } from "./market-event.js";
 import { memberTable } from "./member.js";
@@ -35,6 +36,7 @@ const ENTITY_TABLES: TableDefinition[] = [
 	offerVersionTable,
 	poolTable,
 	feedTable,
+	feedCursorTable,
 	verdictTable,
 	runTable,
 	deadLetterTable,

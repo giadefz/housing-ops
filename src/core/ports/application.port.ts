@@ -45,6 +45,24 @@ export interface OfferDetail {
 	verdicts: Verdict[];
 }
 
+/** A request scoped to one member. */
+export interface MemberQuery {
+	memberId: string;
+}
+
+/** The size of one member's feed, split by judgment. */
+export interface FeedStatus {
+	total: number;
+	unjudged: number;
+	judged: number;
+}
+
+/** One fill attempt: how many were added, and whether the pool has more. */
+export interface FeedFillResult extends FeedStatus {
+	added: number;
+	hasMore: boolean;
+}
+
 /** A request for one offer, as seen by a member. */
 export interface OfferQuery {
 	memberId: string;
@@ -214,6 +232,9 @@ export interface ApplicationPort {
 	testProvider(id: string): Promise<ProviderTestResult>;
 	scan(input: ScanQuery): Promise<ScanResult>;
 	listQueue(input: QueueQuery): Promise<QueueResult>;
+	getFeedStatus(input: MemberQuery): Promise<FeedStatus>;
+	fillFeed(input: MemberQuery): Promise<FeedFillResult>;
+	emptyFeed(input: MemberQuery): Promise<FeedStatus>;
 	setVerdict(input: VerdictCommand): Promise<VerdictResult>;
 	interact(input: InteractionCommand): Promise<InteractionResult>;
 	getProfile(input: ProfileGetInput): ProfileValueResult;

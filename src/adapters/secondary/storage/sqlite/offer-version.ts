@@ -107,3 +107,38 @@ export function listVersions(
 		.all(offerId);
 	return records.map((record) => toDomain(record));
 }
+
+/** Lists versions for many offers in one query, keyed by offer id. */
+export function listVersionsForOffers(
+	database: Database.Database,
+	offerIds: string[],
+): Map<string, OfferVersion[]> {
+	const versions = new Map<string, OfferVersion[]>();
+	if (offerIds.length === 0) return versions;
+	const placeholders = offerIds.map(() => "?").join(", ");
+	const records: unknown[] = database
+		.prepare(
+			`SELECT * FROM offer_versions WHERE offer_id IN (${placeholders})
+			ORDER BY offer_id, version`,
+		)
+		.all(...offerIds);
+	for (const record of records) {
+		const offerId = offerIdOf(record);
+		const list = versions.get(offerId) ?? [];
+		list.push(toDomain(record));
+		versions.set(offerId, list);
+	}
+	return versions;
+}
+
+function offerIdOf(record: unknown): string {
+	if (
+		typeof record === "object" &&
+		record !== null &&
+		"offer_id" in record &&
+		typeof record.offer_id === "string"
+	) {
+		return record.offer_id;
+	}
+	return "unknown";
+}

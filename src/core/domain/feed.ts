@@ -11,3 +11,10 @@ export interface FeedEntry {
 	addedAt: string;
 	state: FeedState;
 }
+
+/** A member's place in the pool while filling the feed. */
+export interface FeedCursor {
+	memberId: string;
+	enteredAt: string;
+	offerId: string;
+}

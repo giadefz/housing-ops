@@ -61,7 +61,7 @@ export async function listFeedEntries(
 	const rows = database
 		.prepare(
 			`SELECT member_id, offer_id, added_at, state FROM feed
-			WHERE member_id = ? ORDER BY added_at DESC, offer_id LIMIT ?`,
+			WHERE member_id = ? ORDER BY added_at DESC, offer_id DESC LIMIT ?`,
 		)
 		.all(memberId, limit) as FeedRow[];
 	return rows.map(toEntry);
@@ -74,4 +74,59 @@ function toEntry(row: FeedRow): FeedEntry {
 		addedAt: row.added_at,
 		state: parseEnum("feed", row.offer_id, "state", row.state, FEED_STATES),
 	};
+}
+
+/** Deletes every entry in a member's feed. Synchronous core of clearFeed. */
+export function clearFeedSync(
+	database: Database.Database,
+	memberId: string,
+): void {
+	database.prepare("DELETE FROM feed WHERE member_id = ?").run(memberId);
+}
+
+/** Deletes every entry in a member's feed. */
+export async function clearFeed(
+	database: Database.Database,
+	memberId: string,
+): Promise<void> {
+	clearFeedSync(database, memberId);
+}
+
+/** Counts every offer in a member's feed. */
+export async function countFeed(
+	database: Database.Database,
+	memberId: string,
+): Promise<number> {
+	const record: unknown = database
+		.prepare("SELECT COUNT(*) AS count FROM feed WHERE member_id = ?")
+		.get(memberId);
+	return countOf(record);
+}
+
+/** Counts the feed offers a member has not judged yet (a reaction is not a judgment). */
+export async function countUnjudged(
+	database: Database.Database,
+	memberId: string,
+): Promise<number> {
+	const record: unknown = database
+		.prepare(
+			`SELECT COUNT(*) AS count FROM feed f
+			LEFT JOIN decisions d
+				ON d.member_id = f.member_id AND d.offer_id = f.offer_id
+			WHERE f.member_id = ? AND d.market_status IS NULL`,
+		)
+		.get(memberId);
+	return countOf(record);
+}
+
+function countOf(record: unknown): number {
+	if (
+		typeof record === "object" &&
+		record !== null &&
+		"count" in record &&
+		typeof record.count === "number"
+	) {
+		return record.count;
+	}
+	return 0;
 }

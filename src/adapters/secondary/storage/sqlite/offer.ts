@@ -70,7 +70,7 @@ function toRecord(offer: Offer): OfferRecord {
 	};
 }
 
-function toDomain(record: unknown): StoredOffer {
+export function toStoredOffer(record: unknown): StoredOffer {
 	const parsed = OfferRecordSchema.safeParse(record);
 	if (!parsed.success)
 		throw new CorruptRecordError(
@@ -150,7 +150,7 @@ export async function findOffer(
 		.prepare("SELECT * FROM offers WHERE id = ?")
 		.get(id);
 	if (record === undefined) return null;
-	return assembleOffer(database, toDomain(record));
+	return assembleOffer(database, toStoredOffer(record));
 }
 
 function assembleOffer(database: Database.Database, base: StoredOffer): Offer {

@@ -71,7 +71,7 @@ function toRecord(dwelling: Dwelling): DwellingRecord {
 	};
 }
 
-function toDomain(record: unknown): Dwelling {
+export function toDwelling(record: unknown): Dwelling {
 	const parsed = DwellingRecordSchema.safeParse(record);
 	if (!parsed.success)
 		throw new CorruptRecordError(
@@ -147,7 +147,7 @@ export async function findDwellingByAddressKey(
 		.prepare("SELECT * FROM dwellings WHERE address_key = ?")
 		.get(addressKey);
 	if (record === undefined) return null;
-	return toDomain(record);
+	return toDwelling(record);
 }
 
 /** Finds a dwelling by id. Null when unknown. */
@@ -159,5 +159,5 @@ export async function findDwellingById(
 		.prepare("SELECT * FROM dwellings WHERE id = ?")
 		.get(id);
 	if (record === undefined) return null;
-	return toDomain(record);
+	return toDwelling(record);
 }

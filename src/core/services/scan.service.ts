@@ -50,6 +50,7 @@ interface ScanWiring {
 interface PooledOffer {
 	offer: Offer;
 	dwelling: Dwelling;
+	enteredAt: string;
 	changed: boolean;
 }
 
@@ -168,10 +169,15 @@ async function tryStore(job: RecordJob): Promise<RecordOutcome> {
 	await store.saveOffer(resolved.offer);
 	await recordVerdicts(store, resolved.offer.id, runId, pool.verdicts);
 	if (!pool.passed) return { kind: "stored" };
-	await store.addToPool(resolved.offer.id, fetchedAt);
+	const enteredAt = await store.addToPool(resolved.offer.id, fetchedAt);
 	return {
 		kind: "pooled",
-		pooled: { offer: resolved.offer, dwelling, changed: resolved.changed },
+		pooled: {
+			offer: resolved.offer,
+			dwelling,
+			enteredAt,
+			changed: resolved.changed,
+		},
 	};
 }
 
@@ -213,7 +219,7 @@ async function placeInFeed(
 	entry: PooledOffer,
 	wiring: ScanWiring,
 ): Promise<void> {
-	const { offer, dwelling, changed } = entry;
+	const { offer, dwelling, enteredAt, changed } = entry;
 	const existing = await wiring.store.findFeedEntry(
 		wiring.memberId,
 		offer.id,
@@ -228,18 +234,19 @@ async function placeInFeed(
 		profile: wiring.profile,
 		comparables: [],
 	});
-	if (run.passed) await publishFeedEntry({ offer, wiring });
+	if (run.passed) await publishFeedEntry({ offer, enteredAt, wiring });
 }
 
 async function publishFeedEntry(job: {
 	offer: Offer;
+	enteredAt: string;
 	wiring: ScanWiring;
 }): Promise<void> {
-	const { offer, wiring } = job;
+	const { offer, enteredAt, wiring } = job;
 	const entry: FeedEntry = {
 		memberId: wiring.memberId,
 		offerId: offer.id,
-		addedAt: wiring.clock.now(),
+		addedAt: enteredAt,
 		state: wiring.profile.gate ? "to-evaluate" : "accepted",
 	};
 	await wiring.store.addToFeed(entry);

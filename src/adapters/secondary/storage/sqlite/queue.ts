@@ -43,7 +43,7 @@ const TO_EVALUATE_SQL = `SELECT ${SUMMARY_COLUMNS}
 	LEFT JOIN decisions dec
 		ON dec.member_id = f.member_id AND dec.offer_id = f.offer_id
 	WHERE f.member_id = ? AND f.state = 'to-evaluate' AND dec.market_status IS NULL
-	ORDER BY f.added_at DESC, f.offer_id LIMIT ?`;
+	ORDER BY f.added_at DESC, f.offer_id DESC LIMIT ?`;
 
 /** A judged view: every decision in the requested market status. */
 const JUDGED_SQL = `SELECT ${SUMMARY_COLUMNS}
