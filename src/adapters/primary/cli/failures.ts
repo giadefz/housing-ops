@@ -23,7 +23,10 @@ import {
 	ProfilePathError,
 } from "../../../core/errors/profile.js";
 import { StoreNotInitializedError } from "../../../core/errors/storage.js";
-import { InstanceExistsError } from "../../../core/errors/instance.js";
+import {
+	InstanceExistsError,
+	InterfaceDisabledError,
+} from "../../../core/errors/instance.js";
 import type { Failure } from "./envelope.js";
 
 interface FailureSpec {
@@ -92,6 +95,10 @@ const failureSpecs = new Map<AppErrorClass, FailureSpec>([
 			code: "INSTANCE_EXISTS",
 			hint: "pass --force to replace instance.yml",
 		},
+	],
+	[
+		InterfaceDisabledError,
+		{ code: "INTERFACE_DISABLED", hint: "enable it in instance.yml" },
 	],
 ]);
 

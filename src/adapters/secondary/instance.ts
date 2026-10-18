@@ -18,6 +18,12 @@ export function readInstanceText(root: string): string | null {
 	return fs.readFileSync(file, "utf8");
 }
 
+/** Reads instance.yml into the deployment identity, or null when it does not exist. */
+export function readInstance(root: string): Instance | null {
+	const text = readInstanceText(root);
+	return text === null ? null : parseInstance(text);
+}
+
 /** Parses instance.yml into the deployment identity. */
 export function parseInstance(text: string): Instance {
 	const parsed = InstanceSchema.safeParse(loadYaml(text));

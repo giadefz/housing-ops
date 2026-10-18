@@ -86,7 +86,8 @@ function describeOne(error: unknown): string {
 	return String(error);
 }
 
-function finish(envelope: Envelope<unknown>): void {
+/** Prints one envelope to stdout and sets the exit code. */
+export function finish(envelope: Envelope<unknown>): void {
 	process.stdout.write(`${JSON.stringify(envelope, null, 2)}\n`);
 	process.exitCode = exitCodeFor(envelope);
 }

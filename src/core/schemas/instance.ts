@@ -13,7 +13,7 @@ export const InstanceSchema = z.object({
 	name: z.string().min(1),
 	country: z.string().min(1),
 	market: z.enum(MARKETS),
-	interfaces: z.array(z.enum(INSTANCE_INTERFACES)).default(["cli"]),
+	interfaces: z.array(z.enum(INSTANCE_INTERFACES)).min(1).default(["cli"]),
 	auth: z
 		.object({
 			issuer: z.string().url().optional(),

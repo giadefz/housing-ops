@@ -8,7 +8,11 @@ import {
 	readInstanceText,
 	writeInstance,
 } from "../src/adapters/secondary/instance.js";
-import { InstanceExistsError } from "../src/core/errors/instance.js";
+import {
+	InstanceExistsError,
+	InterfaceDisabledError,
+} from "../src/core/errors/instance.js";
+import { assertInterfaceEnabled } from "../src/core/services/instance.service.js";
 import type { Instance } from "../src/core/schemas/instance.js";
 
 let roots: string[] = [];
@@ -57,5 +61,26 @@ describe("instance file", () => {
 
 	it("rejects an invalid instance document", () => {
 		expect(() => parseInstance("version: 2\n")).toThrow(/instance.yml/);
+	});
+
+	it("rejects an instance with no interfaces", () => {
+		expect(() =>
+			parseInstance(
+				"version: 1\nname: Home\ncountry: ie\nmarket: rent\ninterfaces: []\n",
+			),
+		).toThrow(/instance.yml/);
+	});
+
+	it("requires an interface only when an instance exists", () => {
+		expect(() => assertInterfaceEnabled(null, "cli")).not.toThrow();
+		expect(() =>
+			assertInterfaceEnabled(instanceFixture(), "cli"),
+		).not.toThrow();
+		expect(() =>
+			assertInterfaceEnabled(
+				{ ...instanceFixture(), interfaces: ["http"] },
+				"cli",
+			),
+		).toThrow(InterfaceDisabledError);
 	});
 });

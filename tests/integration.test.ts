@@ -14,7 +14,7 @@ import { DEFAULT_MEMBER_ID } from "../src/core/domain/member.js";
 import type { Config } from "../src/core/schemas/config.js";
 import type { Instance } from "../src/core/schemas/instance.js";
 import type { Profile } from "../src/core/schemas/profile.js";
-import { createDefaultApplication } from "../src/defaults.js";
+import { createApplication } from "../src/bundled.js";
 
 let roots: string[] = [];
 afterEach(() => {
@@ -128,7 +128,7 @@ describe("end to end", () => {
 	it("validates, scans a process provider, filters, stores, and reads back", async () => {
 		const { root, database } = await workspace();
 		try {
-			const app = await createDefaultApplication(root);
+			const app = await createApplication(root);
 
 			const report = app.validateWorkspace();
 			expect(report.findings.every((finding) => finding.ok)).toBe(true);

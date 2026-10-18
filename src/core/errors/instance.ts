@@ -9,3 +9,11 @@ export class InstanceExistsError extends AppError {
 		this.name = "InstanceExistsError";
 	}
 }
+
+/** Thrown when an interface is not enabled in instance.yml. */
+export class InterfaceDisabledError extends AppError {
+	constructor(name: string) {
+		super(`interface ${name} is not enabled in instance.yml`);
+		this.name = "InterfaceDisabledError";
+	}
+}

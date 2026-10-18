@@ -10,7 +10,7 @@ import type {
 	QueueResult,
 	ValidationReport,
 } from "../src/core/ports/application.port.js";
-import { createDefaultApplication } from "../src/defaults.js";
+import { createApplication } from "../src/bundled.js";
 
 const bootstrap = {
 	instance: {
@@ -60,7 +60,7 @@ async function cli<T>(root: string, ...argv: string[]): Promise<Envelope<T>> {
 			return true;
 		});
 	try {
-		await runCli(await createDefaultApplication(root), [
+		await runCli(await createApplication(root), [
 			"node",
 			"housing-ops",
 			...argv,

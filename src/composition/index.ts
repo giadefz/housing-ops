@@ -11,8 +11,8 @@ import { createWiring } from "./wiring.js";
 
 export type { ApplicationDependencies } from "./types.js";
 
-/** Wires the given adapters into the application surface inbound adapters drive. */
-export async function createApplication(
+/** Composes the given adapters into the application surface inbound adapters drive. */
+export async function composeApplication(
 	root: string,
 	dependencies: ApplicationDependencies,
 ): Promise<ApplicationPort> {
